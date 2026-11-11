@@ -83,6 +83,7 @@ flowchart LR
 ```text
 GeoPulse/
 ├── docs/
+│   ├── DATA_DICTIONARY.md       # Geographic bounds, GPS schema contract, and movement assumptions
 │   ├── PROJECT_CHARTER.md       # Strategic charter, scope, governance, and development roadmap
 │   └── TECHNICAL_OVERVIEW.md    # Technical design, component architectures, and data models
 ├── data/
@@ -140,7 +141,8 @@ To guarantee deterministic builds and reproducible analytical outputs across env
   - [x] Repository topology and configuration (.gitignore, .editorconfig)
   - [x] Project Charter and Strategic Scope ([docs/PROJECT_CHARTER.md](docs/PROJECT_CHARTER.md))
   - [x] Technical Architecture Overview ([docs/TECHNICAL_OVERVIEW.md](docs/TECHNICAL_OVERVIEW.md))
-  - [ ] Week 1 Day 1: Telemetry Generation Engine & Schema Contract (Pending Approval)
+  - [x] Week 1 Day 1: Mobility Data Specification & Environment Foundation ([docs/DATA_DICTIONARY.md](docs/DATA_DICTIONARY.md))
+  - [ ] Week 1 Day 2: Synthetic Telemetry Generator Engine
   - [ ] Week 2: Apache Sedona Spatial Processing & Indexing
   - [ ] Week 3: Snowflake Geospatial Warehousing & Ingestion
   - [ ] Week 4: dbt Dimensional Transformations & Catchment Overlap Modeling
