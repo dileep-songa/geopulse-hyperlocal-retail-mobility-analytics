@@ -53,26 +53,20 @@ flowchart TD
 ## 2. Component Technical Deep-Dives
 
 ### 2.1 Synthetic Data Generation
-The synthetic mobility generation engine is implemented in Python and designed to produce deterministic, realistic urban movement trajectories without real-world telemetry dependencies:
+The synthetic mobility generation engine produces deterministic, realistic urban movement trajectories without real-world telemetry dependencies:
 
-- **Movement Dynamics**:
-  - Simulates agent origins and destinations across commercial clusters using urban road network graphs (via NetworkX / OSMnx topologies).
-  - Employs routing algorithms (Dijkstra / A*) with speed profiles representing pedestrian walking (3–5 km/h) and vehicular transit (20–50 km/h).
-  - Implements temporal diurnal curves reflecting morning commute, lunchtime retail peaks, evening shopping surges, and nighttime lulls.
-- **Stay-Point & Dwell Simulation**:
-  - Implements Poisson-distributed dwell durations within retail polygons to simulate shopping, browsing, and dining activities.
-- **Sensor Noise Injection**:
-  - Adds Gaussian GPS measurement noise ($\sigma \approx 5\text{--}15\text{ meters}$) and simulated multipath canyoning in dense urban environments to mirror real-world mobile device sensor inaccuracies.
-- **Schema Contract**:
-  - Emits partitioned Apache Parquet files adhering to strict typing:
-    - `device_id` (`string` / UUID format)
-    - `timestamp` (`timestamp[us]` / UTC)
-    - `latitude` (`double` / degrees WGS 84)
-    - `longitude` (`double` / degrees WGS 84)
-    - `altitude` (`float` / meters above sea level)
-    - `horizontal_accuracy` (`float` / estimated radius in meters)
-    - `speed` (`float` / meters per second)
-    - `bearing` (`float` / degrees 0–360)
+- **Current Implementation (Week 1 Day 1 & Day 2 — `src/data_generator.py`)**:
+  - Implemented entirely with Python standard-library modules (`math`, `random`, `datetime`, `uuid`, `csv`), requiring zero external dependencies for development agility and testability.
+  - **Temporal Budgeting & Activity Windows**: Enforces exact Day 1 diurnal activity windows defined in `Asia/Kolkata` (Morning 08:00–11:00, Midday 11:30–15:30, Evening 17:00–21:30, Night 22:00–07:00 crossing midnight) with pre-planned trajectory timestamp budgeting ensuring zero observations spill into excluded non-activity gaps.
+  - **Physical Kinematics**: Enforces strict velocity-bounded movement: walking ($0.8\text{--}1.6\text{ m/s}$), vehicular transit ($3.5\text{--}14.0\text{ m/s}$), and stationary dwell ($\le 0.30\text{ m/s}$).
+  - **Dwell Anchoring & Sensor Noise**: Anchors devices at simulated retail POIs with realistic GPS positional uncertainty ($2.0\text{--}35.0\text{ m}$) and localized jitter displacement ($0.5\text{--}3.0\text{ m}$).
+  - **Predictive Inward Boundary Steering**: Heading vectors are predictively reflected inward before displacement when nearing bounding perimeters, preserving exact physical step distance and speed without coordinate truncation or abrupt teleportation.
+  - **Day 1 Canonical Schema Contract**: Generates canonical CSV records with 8 strictly typed fields: `ping_id`, `device_id`, `event_timestamp` (ISO-8601 UTC with `Z`), `latitude` (6 decimals), `longitude` (6 decimals), `accuracy_meters`, `movement_mode`, and `data_provenance` (`geopulse_synthetic_v1`).
+
+- **Planned Extensions (Subsequent Milestones)**:
+  - Integration with OpenStreetMap (OSM) road network graphs (NetworkX / OSMnx) for street-edge snapping and shortest-path routing (Dijkstra / A*).
+  - Gravity interaction models simulating commercial attraction between competing cafe clusters.
+  - Apache Parquet columnar serialization and partitioning during Week 2 distributed spatial engine integration.
 
 ### 2.2 PySpark and Apache Sedona Spatial Processing
 Large-scale spatial filtering and geometric joins cannot scale efficiently on single-node Python processes. GeoPulse leverages PySpark accelerated by Apache Sedona:
@@ -213,10 +207,12 @@ To maintain transparent engineering governance, all platform components are clas
 
 | Architectural Component | Subsystem / Asset | Status | Notes |
 | :--- | :--- | :--- | :--- |
-| **Repository Foundation** | Git configuration, `.gitignore`, `.editorconfig` | **Implemented** | Universal standards, clean git tracking setup. |
+| **Repository Foundation** | Git configuration, `.gitignore`, `.gitattributes`, `.editorconfig` | **Implemented** | Universal standards, LF line ending normalization, clean git tracking setup. |
 | **Governance & Documentation** | `PROJECT_CHARTER.md`, `TECHNICAL_OVERVIEW.md`, `README.md` | **Implemented** | Complete scope, data contracts, and architectural specs. |
 | **Directory Structure** | `data/` (`raw`, `processed`, `reference`), `src/`, `sql/`, `tests/`, `reports/` | **Implemented** | Directories created and preserved via `.gitkeep`. |
-| **Synthetic Simulation Engine** | Trajectory generator, network routing, kinematics, noise injection | *Planned (Week 1)* | Code implementation scheduled for Week 1 Day 1. |
+| **Week 1 Day 1 Specification** | Data specification, study area bounding box, schema contract | **Implemented** | Authored in `src/config.py`, documented in `docs/DATA_DICTIONARY.md`, tested in `tests/test_study_area_spec.py`. |
+| **Week 1 Day 2 Synthetic Generator** | Python trajectory generator, kinematic engine, boundary steering | **Implemented** | Engine in `src/data_generator.py`, test suite in `tests/test_data_generator.py`, report in `reports/WEEK1_DAY2_GENERATION_REPORT.md`. |
+| **Week 1 Day 3: Data Quality and Mobility Validation** | Primary: missing values, duplicates, coordinate bounds, timestamp consistency, device chronology, speed limits, interval compliance, and trajectory validation; Supporting: exploratory spatial distribution summaries | *Pending (Week 1 Day 3)* | Next scheduled milestone. |
 | **Distributed Spatial Engine** | PySpark / Sedona spatial joins, H3 binning jobs | *Planned (Week 2)* | Cluster configuration and Spark jobs to be authored in `src/`. |
 | **Snowflake Warehouse Layer** | Stage DDLs, raw/staging table definitions, clustering keys | *Planned (Week 3)* | SQL DDL scripts to be authored in `sql/`. |
 | **dbt Transformation Models** | Staging, intermediate dwell detection, gold footfall & overlap marts | *Planned (Week 4)* | dbt project initialization and model authoring. |

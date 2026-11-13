@@ -1,0 +1,30 @@
+# ==============================================================================
+# GeoPulse - Git Attributes & Line Ending Configuration
+# Domain: Retail Strategy and Geospatial Analytics
+# ==============================================================================
+
+# Auto-detect text files and normalize line endings to LF on commit
+* text=auto eol=lf
+
+# Explicit source code & documentation file types (strictly LF)
+*.py text eol=lf
+*.md text eol=lf
+*.sql text eol=lf
+*.json text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.csv text eol=lf
+*.txt text eol=lf
+.editorconfig text eol=lf
+.gitignore text eol=lf
+.gitattributes text eol=lf
+.gitkeep text eol=lf
+
+# Binary file types
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.parquet binary
+*.gz binary
+*.zip binary
+*.pyc binary

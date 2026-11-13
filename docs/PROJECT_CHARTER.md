@@ -8,7 +8,7 @@
 | **Domain** | Retail Strategy, Geospatial Engineering, and Urban Mobility Analytics |
 | **Repository** | `https://github.com/dileep-songa/geopulse-hyperlocal-retail-mobility-analytics` |
 | **Author / Lead** | Dileep Songa (Internship Project) |
-| **Project Stage** | Repository Foundation / Pre-Development Initialization |
+| **Project Stage** | Week 1: Synthetic Telemetry Engine (Day 1 & Day 2 Complete; Day 3 Pending) |
 | **Target Audience** | Data Engineering Evaluators, Geospatial Architects, Retail Analytics Leads |
 
 ---
@@ -31,9 +31,9 @@ Furthermore, multi-unit retail brands face significant risk of **store cannibali
 **GeoPulse** is an end-to-end geospatial intelligence platform powered by mathematically modeled, synthetic mobile mobility observations. The platform simulates realistic urban pedestrian and vehicular trajectories, processes spatial interactions at scale, and loads the data into a modern cloud data warehouse for analytical modeling and spatial visualization.
 
 By coupling synthetic data simulation with modern data engineering tooling:
-1. **Privacy-by-Design**: Completely eliminates real-world consumer tracking and PII liabilities while preserving realistic spatial-temporal properties.
+1. **Privacy-Conscious Architecture**: Completely eliminates real-world consumer tracking and PII handling by relying exclusively on synthetic trajectory simulation. (Note: While this synthetic architecture eliminates personal data collection by design, it represents an engineering choice rather than an automatic legal compliance guarantee or formal statutory certification).
 2. **Open Architectural Pattern**: Demonstrates a complete reference architecture connecting distributed spatial computing (Apache Sedona / PySpark), cloud data warehousing (Snowflake), transformation and data testing (dbt), and geospatial visualization (Kepler.gl / React).
-3. **Actionable Retail Intelligence**: Computes store catchment zones, visit duration distributions, footfall volume heatmaps, and spatial cannibalization metrics for retail networks.
+3. **Actionable Retail Intelligence**: Computes store catchment zones, visit duration distributions, footfall volume heatmaps, and spatial cannibalization metrics for retail networks using simulated telemetry.
 
 ---
 
@@ -56,9 +56,10 @@ By coupling synthetic data simulation with modern data engineering tooling:
 
 ### 5.1 In-Scope
 - **Synthetic Mobility Simulation**:
-  - Configurable spatial bounding boxes (commercial urban districts).
-  - Plausible kinematic models (pedestrian walking speeds, road network routing, dwell stop points).
-  - Injection of realistic GPS measurement variance (Gaussian spatial jitter).
+  - Configurable spatial bounding boxes (commercial urban districts; Week 1 baseline: Indiranagar, Bengaluru).
+  - Plausible kinematic models (pedestrian walking speeds, vehicular transit speeds, dwell stop points, and predictive boundary steering).
+  - Injection of realistic GPS measurement variance (simulated horizontal accuracy radius).
+  - *Planned Refinements*: OpenStreetMap road network graph routing and gravity interaction models in subsequent phases.
 - **Spatial Data Engineering**:
   - Spatial indexing via H3 discrete global grid system or Geohash.
   - Point-in-polygon spatial containment joining simulated telemetry against retail building polygons.
@@ -124,7 +125,9 @@ By coupling synthetic data simulation with modern data engineering tooling:
 
 ## 9. Limitations and Assumptions
 
-- **Behavioral Simplifications**: Simulated agents follow probabilistic gravity models and road network paths; unexpected human real-world deviations (e.g., flash gatherings or sudden transit diversions) are not fully represented.
+- **Behavioral Simplifications**: Simulated agents follow algorithmic movement heuristics (velocity-bounded random walks with dwell anchoring and predictive boundary steering); complex real-world human deviations (e.g., flash gatherings or sudden transit diversions) and micro-traffic vehicle physics are not represented.
+- **Predictive Boundary Steering**: Boundary turnaround steering is an algorithmic simulation rule to keep generated agents within the study envelope, not physical road navigation.
+- **Synthetic Data Baseline**: No observed human footfall or real-world consumer transactions are measured; all outputs represent synthetic simulations for engineering evaluation.
 - **Compute Sizing**: The architecture is designed to run efficiently on developer workstations and cost-effective single-cluster cloud environments.
 - **Spatial Resolution**: Trajectories and spatial polygons are normalized using WGS 84 (`EPSG:4326`) and H3 discrete spatial binning (resolutions 8 to 10).
 

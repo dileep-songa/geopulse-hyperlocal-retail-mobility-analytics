@@ -106,7 +106,7 @@ Reproducibility was verified by executing independent generator instances using 
 
 ## 6. Known Limitations
 
-- **Simplified Road Topology**: The simulation uses directional persistence and boundary reflection rather than snapping coordinates to OpenStreetMap (OSM) graph edges (planned for subsequent GIS refinement).
+- **Simplified Road Topology**: The simulation uses directional persistence and predictive inward boundary steering rather than snapping coordinates to OpenStreetMap (OSM) graph edges (planned for subsequent GIS refinement).
 - **Planar Representation**: Elevation and indoor multi-story floor traversal inside malls are not modeled.
 - **Simulation Scale**: 10,000 pings across 500 devices was chosen for fast local iteration and unit testing.
 
