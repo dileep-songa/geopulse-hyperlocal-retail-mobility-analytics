@@ -31,7 +31,7 @@ The designated study area is **Indiranagar**, a premier commercial and residenti
 
 ### 2.2 Bounding Envelope and Coordinate Bounds
 
-All simulated GPS observations are strictly confined to the following geodetic bounding box:
+All simulated GPS observations are confined to the following inclusive geodetic bounding box:
 
 | Boundary Parameter | Geodetic Coordinate | Description / Landmark Reference |
 | :--- | :--- | :--- |
@@ -142,7 +142,7 @@ Simulated agents follow an urban commercial activity curve reflective of Bengalu
 
 ### 4.4 Boundary Enforcement & Realistic Movement
 
-- **Strict Boundary Enclosure**: All generated coordinates must strictly remain within the defined bounding box $[77.6250, 77.6550] \times [12.9650, 12.9900]$.
+- **Inclusive Boundary Containment**: All generated coordinates must remain within the defined inclusive bounding box $[77.6250, 77.6550] \times [12.9650, 12.9900]$ ($77.6250 \le \text{longitude} \le 77.6550$ and $12.9650 \le \text{latitude} \le 12.9900$).
 - **Smooth Boundary Redirection**: Trajectory generation algorithms must avoid abrupt, unrealistic spatial jumps or teleportation when encountering boundaries. When a simulated agent approaches a perimeter edge, smooth deceleration and steering deflection or boundary turnaround vectors must be applied to guide the agent back toward internal commercial corridors.
 - **Synthetic Movement Rule Disclaimer**: Any reflection, redirection, or velocity damping applied at the bounding perimeter is an algorithmic simulation rule, not actual physical road navigation or vehicle physics.
 - **Envelope Scope Disclaimer**: The bounding box represents an analytical study perimeter selected for development tractability; it does not represent an exact municipal, postal, or commercial border.

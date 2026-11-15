@@ -87,9 +87,14 @@ Snowflake serves as the centralized analytical data warehouse:
   - Uses Snowflake's native `GEOGRAPHY` data type, modeling features on the WGS 84 ellipsoidal surface and enabling spherical distance calculations without local projection distortion.
   - Selectively uses `GEOMETRY` for planar cadastral boundary operations.
 - **Storage & Clustering Strategy**:
-  - Organizes raw telemetry tables clustered by `DATE(timestamp)` and `H3_CELL_ID` to optimize micro-partition pruning for spatial-temporal range queries.
+  - Organizes telemetry tables clustered by `DATE(event_timestamp)` and `movement_mode` (and downstream `H3_CELL_ID`) to optimize micro-partition pruning for spatial-temporal range queries.
 - **Ingestion Mechanisms**:
-  - Parquet staging via internal/external stages using vectorized `COPY INTO` commands with automated schema validation.
+  - CSV / Parquet staging via internal/external stages using vectorized `COPY INTO` commands with automated schema validation.
+- **Week 1 Day 4 Spatial Preparation (Prepared Offline SQL)**:
+  - Authored local DDL and transformation scripts (`sql/snowflake/001_create_raw_mobility_table.sql` and `sql/snowflake/002_create_spatial_mobility_table.sql`).
+  - Implements the canonical 8-field raw landing schema and enriches records with native `GEOGRAPHY` points using `ST_MAKEPOINT(longitude, latitude)` (longitude first, latitude second).
+  - Documents Snowflake's informational constraint behavior (informational `PRIMARY KEY` vs. enforced `NOT NULL`).
+  - These SQL scripts remain strictly unexecuted in Week 1 to preserve a local-first, offline development environment without cloud billing or credential dependencies prior to Week 3.
 
 ### 2.4 dbt Transformations
 The analytical modeling layer is authored in dbt (data build tool), structured around a medallion architecture:
@@ -212,9 +217,10 @@ To maintain transparent engineering governance, all platform components are clas
 | **Directory Structure** | `data/` (`raw`, `processed`, `reference`), `src/`, `sql/`, `tests/`, `reports/` | **Implemented** | Directories created and preserved via `.gitkeep`. |
 | **Week 1 Day 1 Specification** | Data specification, study area bounding box, schema contract | **Implemented** | Authored in `src/config.py`, documented in `docs/DATA_DICTIONARY.md`, tested in `tests/test_study_area_spec.py`. |
 | **Week 1 Day 2 Synthetic Generator** | Python trajectory generator, kinematic engine, boundary steering | **Implemented** | Engine in `src/data_generator.py`, test suite in `tests/test_data_generator.py`, report in `reports/WEEK1_DAY2_GENERATION_REPORT.md`. |
-| **Week 1 Day 3: Data Quality and Mobility Validation** | Primary: missing values, duplicates, coordinate bounds, timestamp consistency, device chronology, speed limits, interval compliance, and trajectory validation; Supporting: exploratory spatial distribution summaries | *Pending (Week 1 Day 3)* | Next scheduled milestone. |
+| **Week 1 Day 3: Data Quality and Mobility Validation** | Independent validation engine, strict CSV parsing, geodetic & temporal audits, kinematic verification | **Implemented** | Engine in `src/data_quality.py`, unit test suite (36 tests) in `tests/test_data_quality.py`, report in `reports/WEEK1_DAY3_DATA_QUALITY_VALIDATION_REPORT.md`. |
+| **Week 1 Day 4: Spatial Data Engineering Preparation** | Snowflake DDL definitions, WGS 84 / EPSG:4326 spatial point modeling, GEOGRAPHY enrichment | **Prepared** | Offline SQL DDL scripts in `sql/snowflake/`, report in `reports/WEEK1_DAY4_SPATIAL_ENGINEERING_REPORT.md`. Unexecuted in Week 1; ready for Week 3 cloud deployment. |
 | **Distributed Spatial Engine** | PySpark / Sedona spatial joins, H3 binning jobs | *Planned (Week 2)* | Cluster configuration and Spark jobs to be authored in `src/`. |
-| **Snowflake Warehouse Layer** | Stage DDLs, raw/staging table definitions, clustering keys | *Planned (Week 3)* | SQL DDL scripts to be authored in `sql/`. |
+| **Snowflake Cloud Execution & Ingestion** | Cloud execution of stage DDLs, raw/staging table loading, clustering keys | *Planned (Week 3)* | Deployment of prepared SQL scripts to active Snowflake account. |
 | **dbt Transformation Models** | Staging, intermediate dwell detection, gold footfall & overlap marts | *Planned (Week 4)* | dbt project initialization and model authoring. |
 | **Kepler.gl / React Frontend** | Interactive web application, layer controls, trajectory playback | *Planned (Week 5)* | Web application development. |
 | **Airflow Orchestration** | Production DAGs, sensor operators, SLA monitors | *Planned (Week 6)* | DAG definitions and scheduling infrastructure. |

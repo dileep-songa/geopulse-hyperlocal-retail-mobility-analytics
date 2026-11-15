@@ -1,7 +1,7 @@
 # GeoPulse: Hyper-Local Retail Mobility Analytics
 
 [![Domain](https://img.shields.io/badge/Domain-Retail%20Strategy%20%26%20Geospatial%20Analytics-blue.svg)](#business-problem)
-[![Status](https://img.shields.io/badge/Status-Week%201%20Day%203%20Complete-brightgreen.svg)](#current-project-status)
+[![Status](https://img.shields.io/badge/Status-Week%201%20Day%204%20Complete-brightgreen.svg)](#current-project-status)
 [![Data-Privacy](https://img.shields.io/badge/Privacy-100%25%20Synthetic%20Data-purple.svg)](#data-privacy-and-synthetic-data-disclaimer)
 
 GeoPulse is a modern geospatial analytics and data engineering platform engineered to analyze urban foot traffic, commercial corridor dynamics, and retail catchment overlap using privacy-preserving synthetic mobility telemetry.
@@ -101,9 +101,13 @@ GeoPulse/
 ├── reports/
 │   ├── .gitkeep
 │   ├── WEEK1_DAY2_GENERATION_REPORT.md             # Day 2 synthetic generation audit & kinematic verification
-│   └── WEEK1_DAY3_DATA_QUALITY_VALIDATION_REPORT.md # Day 3 data quality, schema, & mobility validation report
+│   ├── WEEK1_DAY3_DATA_QUALITY_VALIDATION_REPORT.md # Day 3 data quality, schema, & mobility validation report
+│   └── WEEK1_DAY4_SPATIAL_ENGINEERING_REPORT.md     # Day 4 Snowflake spatial DDL & WGS 84 engineering report
 ├── sql/
-│   └── .gitkeep                 # Standalone SQL scripts, DDL definitions, and warehouse queries (Week 3)
+│   ├── .gitkeep
+│   └── snowflake/               # Prepared Snowflake DDL & spatial transformation scripts (Week 1 Day 4)
+│       ├── 001_create_raw_mobility_table.sql
+│       └── 002_create_spatial_mobility_table.sql
 ├── src/
 │   ├── .gitkeep
 │   ├── __init__.py              # Python package marker
@@ -156,12 +160,13 @@ To guarantee deterministic builds and reproducible analytical outputs across env
 
 ## Current Project Status
 
-- **Overall Status**: **Week 1 Day 3 Complete**
+- **Overall Status**: **Week 1 Day 4 Complete**
 - **Milestone Progress**:
   - [x] Repository Foundation: Complete (Git setup, governance, `.editorconfig`, `.gitignore`, `.gitattributes`, [docs/PROJECT_CHARTER.md](docs/PROJECT_CHARTER.md), [docs/TECHNICAL_OVERVIEW.md](docs/TECHNICAL_OVERVIEW.md))
   - [x] Week 1 Day 1: Complete — Mobility Data Specification & Environment Foundation ([docs/DATA_DICTIONARY.md](docs/DATA_DICTIONARY.md), `src/config.py`, `tests/test_study_area_spec.py`)
   - [x] Week 1 Day 2: Complete — Synthetic Telemetry Generator Engine ([reports/WEEK1_DAY2_GENERATION_REPORT.md](reports/WEEK1_DAY2_GENERATION_REPORT.md), `src/data_generator.py`, `tests/test_data_generator.py`)
   - [x] Week 1 Day 3: Complete — Data Quality and Mobility Validation ([reports/WEEK1_DAY3_DATA_QUALITY_VALIDATION_REPORT.md](reports/WEEK1_DAY3_DATA_QUALITY_VALIDATION_REPORT.md), `src/data_quality.py`, `tests/test_data_quality.py`)
+  - [x] Week 1 Day 4: Complete — Spatial Data Engineering Preparation ([reports/WEEK1_DAY4_SPATIAL_ENGINEERING_REPORT.md](reports/WEEK1_DAY4_SPATIAL_ENGINEERING_REPORT.md), `sql/snowflake/`)
   - [ ] Week 2: Planned — Apache Sedona Distributed Spatial Processing & Indexing
   - [ ] Week 3: Planned — Snowflake Geospatial Warehousing & Ingestion
   - [ ] Week 4: Planned — dbt Dimensional Transformations & Catchment Overlap Modeling
