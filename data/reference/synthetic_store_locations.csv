@@ -1,0 +1,5 @@
+store_id,store_name,longitude,latitude,location_type,data_provenance
+STORE_A,GeoPulse Coffee A,77.6320,12.9760,hypothetical_candidate,geopulse_synthetic_v1
+STORE_B,GeoPulse Coffee B,77.6400,12.9780,hypothetical_candidate,geopulse_synthetic_v1
+STORE_C,GeoPulse Coffee C,77.6480,12.9810,hypothetical_candidate,geopulse_synthetic_v1
+STORE_D,GeoPulse Coffee D,77.6380,12.9860,hypothetical_candidate,geopulse_synthetic_v1
