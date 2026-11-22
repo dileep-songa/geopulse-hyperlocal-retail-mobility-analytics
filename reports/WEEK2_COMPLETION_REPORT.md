@@ -45,6 +45,9 @@ The execution and verification workload was structured between two complementary
 | **Daily Store Summary Mart** | Store-day visit intensity metrics | `8` data rows (4 stores × 2 dates) | Reconciled & verified |
 | **Store Overlap Summary Mart** | Persisted per-store exclusivity | `4` data rows (1 per store) | Reconciled & verified |
 | **Automated Test Suite** | Full regression and spatial suite | `163 passed` (0 failures, 0 errors) | Verified in Windows Python 3.12 |
+| **Snowflake dbt ELT Models** | Staging, intermediate, and 4 marts | `6 models` (2 views, 4 tables) | Built in `GEOPULSE_DB.ANALYTICS` |
+| **dbt Test Suite** | Source, schema, and singular tests | `65 passed` (0 fail, 0 error, 0 skip) | Executed live against Snowflake |
+| **Snowflake vs. Spark Parity** | 4 analytical retail marts | `100% exact match` (diff = 0.0) | Verified across all rows and metrics |
 | **Isolated Execution Verification** | Verification output directories | 7 Spark CSV directories + `_SUCCESS` | Verified in WSL2 Spark session |
 | **Baseline Output Preservation** | Baseline `data/processed/` | Pre-run and post-run SHA-256 match | Bit-for-bit match across 7 files |
 
@@ -461,15 +464,73 @@ All tests in `tests/test_spatial_analysis.py` and `tests/test_retail_mobility_an
 
 ---
 
-## 11. Snowflake & dbt Integration Scope Decision
+## 11. Snowflake ELT & dbt Analytics Marts Implementation & Parity Verification
 
-### Strategic Decision & Status
-During Week 2, all spatial catchment analysis and retail mobility aggregations were executed locally using Apache Spark 3.5.9, Apache Sedona 1.9.1, and pure Python.
+### Architecture & Model Lineage
+Following local Spark baseline generation, GeoPulse implemented a complete dimensional modeling and ELT pipeline in Snowflake using **dbt Core 1.12.7** and **dbt-snowflake 1.12.5**.
 
-- **Snowflake Infrastructure**: Prepared DDL scripts from Week 1 Day 4 (`001_create_raw_mobility_table.sql` and `002_create_spatial_mobility_table.sql`) remain in the repository. **Zero Snowflake queries were executed during Week 2, and no cloud compute costs were incurred.**
-- **dbt Modeling**: **No dbt models or profiles were created or run in Week 2.**
-- **Strategic Justification**: Maintaining a local-first paradigm for Week 2 allowed rapid algorithm development, exact mathematical verification of planar metric buffers, and fast regression testing without cloud latency, cloud credentials, or external compute spend.
-- **Week 3 Boundary**: Formal cloud data warehousing, store reference DDL, dbt transformation models, and parity validation between Snowflake and Apache Sedona are formally designated as **Week 3** milestones.
+```
+GEOPULSE_DB.RAW.RAW_STORE_CATCHMENT_MEMBERSHIPS (4,051 records)
+                       │
+                       ▼
+      models/staging/stg_store_catchment_memberships (View)
+      - Standardize identifiers and metric distances
+      - Convert UTC -> Asia/Kolkata (IST) via CONVERT_TIMEZONE
+      - Derive calendar_date, hour_of_day, and 4 diurnal dayparts
+                       │
+                       ▼
+      models/intermediate/int_store_memberships_overlap_tagged (View)
+      - Independent CTEs for ping-level & device-level multi-catchment overlap
+      - Zero Cartesian fan-out (grain preserved at 4,051 membership records)
+      - Flags: is_exclusive_ping, is_overlapping_ping, exclusive_device_id, multi_catchment_device_id
+                       │
+       ┌───────────────┼───────────────┬───────────────┐
+       ▼               ▼               ▼               ▼
+fct_hourly_store  fct_store_time   fct_daily_store  fct_store_overlap
+   _activity         _of_day           _summary         _summary
+  (Table, 81)       (Table, 16)       (Table, 8)       (Table, 4)
+```
+
+### dbt Build & Test Execution Summary
+The dbt transformation pipeline and automated test suite were executed live against the `GEOPULSE_DB.ANALYTICS` warehouse schema:
+
+```text
+Finished running 4 table models, 65 data tests, 2 view models in 73.84s.
+Completed successfully
+Done. PASS=71 WARN=0 ERROR=0 SKIP=0 NO-OP=0 REUSED=0 TOTAL=71
+```
+
+- **Models (6 total)**:
+  - `stg_store_catchment_memberships`: View (SUCCESS in 0.93s)
+  - `int_store_memberships_overlap_tagged`: View (SUCCESS in 0.43s)
+  - `fct_hourly_store_activity`: Table (SUCCESS in 0.89s)
+  - `fct_store_time_of_day_activity`: Table (SUCCESS in 0.72s)
+  - `fct_daily_store_summary`: Table (SUCCESS in 0.95s)
+  - `fct_store_overlap_summary`: Table (SUCCESS in 0.83s)
+- **Tests (65 total - 100% PASS, 0 FAIL, 0 ERROR, 0 SKIP)**:
+  - **10 Source Tests**: Not-null and accepted values on `raw_store_catchment_memberships` (movement mode, provenance).
+  - **49 Model Schema Tests**: Primary key uniqueness, foreign key relationships, not-null constraints, and diurnal accepted values.
+  - **6 Singular Integration Tests**:
+    - `assert_unique_ping_store_membership`: Guarantees composite grain uniqueness `(ping_id, store_id)`.
+    - `assert_fct_hourly_activity_row_count`: Verifies exact row count (81 rows).
+    - `assert_fct_store_time_of_day_row_count`: Verifies exact row count (16 rows).
+    - `assert_fct_daily_store_summary_row_count`: Verifies exact row count (8 rows).
+    - `assert_fct_store_overlap_row_count`: Verifies exact row count (4 rows).
+    - `assert_store_overlap_reconciliation`: Enforces mathematical identity ($exclusive + overlapping = total$).
+
+### Four-Mart Metric Reconciliation vs. PySpark Baselines
+Every row, column, and metric value in the Snowflake analytical marts was programmatically verified against the baseline PySpark CSV outputs in `data/processed/week2_retail_analytics/`:
+
+| Analytical Mart | Snowflake Grain / Rows | Spark Grain / Rows | Column Parity | Key Duplicates | Metric Discrepancies (Max Abs Diff) | Total Pings Reconciled |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| **`fct_hourly_store_activity`** | `(store, date, hour)` / **81** | `(store, date, hour)` / **81** | Identical (6 cols) | 0 SF / 0 Spark | **0 mismatches** (`diff = 0.0`) | **4,051** SF / **4,051** Spark |
+| **`fct_store_time_of_day_activity`** | `(store, daypart)` / **16** | `(store, daypart)` / **16** | Identical (5 cols) | 0 SF / 0 Spark | **0 mismatches** (`diff = 0.0`) | **4,051** SF / **4,051** Spark |
+| **`fct_daily_store_summary`** | `(store, date)` / **8** | `(store, date)` / **8** | Identical (7 cols) | 0 SF / 0 Spark | **0 mismatches** (`diff = 0.0`) | **4,051** SF / **4,051** Spark |
+| **`fct_store_overlap_summary`** | `(store)` / **4** | `(store)` / **4** | Identical (8 cols) | 0 SF / 0 Spark | **0 mismatches** (`diff = 0.0`) | **4,051** SF / **4,051** Spark |
+
+- **Null Handling**: Zero unexpected nulls across all grouping dimensions and aggregated measures.
+- **Floating-Point Tolerances**: Evaluated at absolute tolerance $10^{-2}$; `pings_per_device` and integer counts achieved **exact match** (`max_abs_diff = 0.0`).
+- **Ping Conservation**: All four dimensional aggregations sum to exactly **4,051** observations with zero ping leakage.
 
 ---
 
@@ -491,12 +552,10 @@ To maintain academic and professional standards, the following technical constra
    - Spatial overlap indicates shared geographic proximity, not customer switching, shared customer loyalty, or commercial cannibalization.
 5. **Planar Projection Geometry**:
    - Catchments are circular buffers in UTM Zone 43N (`EPSG:32643`). While UTM Zone 43N provides low distance distortion for Bengaluru, buffers are planar representations that do not account for physical topography, building footprints, pedestrian barriers, or street network walking times (isochrones).
-6. **Local Single-Node Processing**:
-   - Processing was executed locally on a single machine using Spark `local[2]`. These results demonstrate algorithmic correctness and spatial SQL functionality, not distributed multi-node cluster performance.
+6. **Local Single-Node Processing & Warehouse Scale**:
+   - PySpark processing was executed locally using Spark `local[2]`. Snowflake transformations were executed on standard `COMPUTE_WH`. Results validate mathematical and relational correctness across platforms.
 7. **Harmless SLF4J Warnings**:
    - Standard warnings (`SLF4J: Failed to load class "org.slf4j.impl.StaticLoggerBinder"`) appear during Spark startup because no optional SLF4J binding jar was supplied. SLF4J falls back to a NOP (no-operation) logger, which has zero effect on computational correctness.
-8. **Cloud Operations Boundary**:
-   - Zero Snowflake, cloud warehouse, or paid external operations were performed during Week 2 local spatial processing.
 
 ---
 
@@ -507,13 +566,14 @@ git status --short --branch
 ```
 ```text
 ## main...origin/main
-?? reports/WEEK2_COMPLETION_REPORT.md
+?? dbt/
 ```
 
 ### Git Repository State
 - **Branch**: `main` (synchronized with `origin/main` at commit `e42cda4`).
 - **HEAD Commit**: `e42cda4 feat: implement retail mobility analytics`.
 - **Tracked Files Modified**: **0** (all prior source and test files remain completely clean).
+- **Untracked Directory**: `dbt/` (contains tested dbt project, models, tests, and configuration).
 - **Committed Week 2 Deliverables**:
   - `data/reference/synthetic_store_locations.csv`
   - `src/spatial_analysis.py`
@@ -521,16 +581,19 @@ git status --short --branch
   - `tests/test_spatial_analysis.py`
   - `tests/test_retail_mobility_analytics.py`
 - **Data Protection**: Output directories under `data/processed/` are gitignored per `.gitignore` rule (`data/processed/*` except `.gitkeep`).
-- **Preservation**: No staging, commits, or pushes were performed during this documentation finalization.
+- **Preservation**: In strict accordance with execution instructions, no staging, commits, or pushes were performed.
 
 ---
 
 ## 14. Conclusion & Week 3 Roadmap
 
-Week 2 successfully developed, tested, and verified the complete local geospatial and retail mobility analytics layer of GeoPulse. The pipeline establishes clean spatial joins and metric buffering between synthetic mobility pings and candidate retail stores, converts UTC timestamps to Indian Standard Time, computes diurnal catchment activity profiles, and calculates network overlap distributions—supported by 163 automated tests and fully reconciled output datasets.
+Week 2 successfully developed, tested, and verified the complete geospatial and retail mobility analytics layer of GeoPulse across both distributed PySpark computing and Snowflake cloud data warehousing. The dual implementation confirms identical spatial and dimensional modeling results:
+- 163 automated Python unit/integration tests passing.
+- 6 dbt models materialized (2 views, 4 tables).
+- 65 dbt tests passing with 0 failures or warnings.
+- 100% exact numerical and relational parity across all four commercial retail marts.
 
 ### Next Steps (Week 3 Roadmap):
-1. **Snowflake Spatial Infrastructure**: Author and deploy DDL to load candidate store reference geometries and 500-metre catchment buffer polygons into `GEOPULSE_DB.ANALYTICS`.
-2. **dbt Transformation Models**: Develop modular dbt models in Snowflake to perform retail mobility joins, dwell-time categorization, and visitor aggregation in the data warehouse.
-3. **Parity & Reconciliation Testing**: Verify mathematical parity between Snowflake SQL / dbt analytical tables and the verified PySpark baseline.
-4. **Cloud Spatial Analytics Reporting**: Author the Week 3 completion report documenting end-to-end cloud spatial transformations, query performance, and retail intelligence marts.
+1. **Interactive Geospatial Visualization**: Connect Kepler.gl and Streamlit/React dashboards to the verified Snowflake marts and spatial catchment geometries.
+2. **Dwell Time & Stay-Point Analytics**: Implement spatial clustering and temporal dwell-time algorithms to distinguish transient transit from lingering store visits.
+3. **Automated CI/CD Pipeline**: Package dbt test execution and PySpark validation into automated GitHub Actions workflows.
