@@ -1,0 +1,32 @@
+version: 2
+
+models:
+  - name: int_store_memberships_overlap_tagged
+    description: "Intermediate membership records enriched with ping-level and device-level store catchment overlap flags."
+    columns:
+      - name: ping_id
+        description: "Observation ping identifier."
+        tests:
+          - not_null
+      - name: device_id
+        description: "Synthetic device identifier."
+        tests:
+          - not_null
+      - name: store_id
+        description: "Store candidate identifier."
+        tests:
+          - not_null
+      - name: is_exclusive_ping
+        description: "Binary flag (1/0) indicating whether the ping intersected exactly one store catchment."
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [0, 1]
+      - name: is_overlapping_ping
+        description: "Binary flag (1/0) indicating whether the ping intersected multiple store catchments."
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [0, 1]

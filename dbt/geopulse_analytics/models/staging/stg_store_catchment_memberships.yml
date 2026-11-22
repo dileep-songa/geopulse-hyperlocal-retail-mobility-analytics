@@ -1,0 +1,63 @@
+version: 2
+
+models:
+  - name: stg_store_catchment_memberships
+    description: "Cleaned and standardized catchment memberships with local Asia/Kolkata timestamps, dates, hours, and diurnal period classifications."
+    columns:
+      - name: ping_id
+        description: "Observation ping identifier."
+        tests:
+          - not_null
+      - name: device_id
+        description: "Synthetic device identifier."
+        tests:
+          - not_null
+      - name: event_timestamp
+        description: "Observation timestamp in UTC."
+        tests:
+          - not_null
+      - name: event_timestamp_ist
+        description: "Observation timestamp converted to Indian Standard Time (Asia/Kolkata)."
+        tests:
+          - not_null
+      - name: calendar_date
+        description: "Calendar date in local Indian Standard Time."
+        tests:
+          - not_null
+      - name: hour_of_day
+        description: "Hour of day (0-23) in local Indian Standard Time."
+        tests:
+          - not_null
+      - name: time_of_day
+        description: "Diurnal daypart classification: morning (06-11), afternoon (12-16), evening (17-21), night (22-05)."
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['morning', 'afternoon', 'evening', 'night']
+      - name: store_id
+        description: "Store candidate identifier."
+        tests:
+          - not_null
+      - name: store_name
+        description: "Store candidate name."
+        tests:
+          - not_null
+      - name: distance_meters
+        description: "Planar metric distance in metres."
+        tests:
+          - not_null
+      - name: movement_mode
+        description: "Movement mode enum."
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['pedestrian_walking', 'stationary_dwell', 'vehicular_transit']
+      - name: data_provenance
+        description: "Data provenance tag."
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['geopulse_synthetic_v1']

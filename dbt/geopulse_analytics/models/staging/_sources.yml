@@ -1,0 +1,55 @@
+version: 2
+
+sources:
+  - name: raw
+    database: GEOPULSE_DB
+    schema: RAW
+    description: "Raw landing schema for GeoPulse mobility and spatial reference datasets."
+    tables:
+      - name: raw_store_catchment_memberships
+        description: "Raw spatial point-in-polygon catchment membership records joining mobility pings to 500m store buffers."
+        columns:
+          - name: ping_id
+            description: "Globally unique RFC 4122 UUIDv4 identifier for the discrete GPS observation ping."
+            tests:
+              - not_null
+          - name: device_id
+            description: "Pseudonymous RFC 4122 UUIDv4 identifier of the simulated agent."
+            tests:
+              - not_null
+          - name: event_timestamp
+            description: "Observation timestamp in timezone-aware UTC."
+            tests:
+              - not_null
+          - name: store_id
+            description: "Alphanumeric identifier of the candidate retail store (e.g. STORE_A, STORE_B)."
+            tests:
+              - not_null
+          - name: store_name
+            description: "Descriptive name of the synthetic retail coffee candidate storefront."
+            tests:
+              - not_null
+          - name: distance_meters
+            description: "Planar Euclidean distance in metres from ping to store centroid in EPSG:32643."
+            tests:
+              - not_null
+          - name: movement_mode
+            description: "Kinematic movement mode: pedestrian_walking, stationary_dwell, or vehicular_transit."
+            tests:
+              - not_null
+              - accepted_values:
+                  arguments:
+                    values: ['pedestrian_walking', 'stationary_dwell', 'vehicular_transit']
+          - name: data_provenance
+            description: "Constant provenance metadata tag: geopulse_synthetic_v1."
+            tests:
+              - not_null
+              - accepted_values:
+                  arguments:
+                    values: ['geopulse_synthetic_v1']
+          - name: _ingested_at
+            description: "Warehouse ingestion audit timestamp recorded when loaded into Snowflake."
+          - name: _staged_file_name
+            description: "Source filename in Snowflake stage from which this record was loaded."
+          - name: _staged_file_row_number
+            description: "Row number of this record within the staged source file."

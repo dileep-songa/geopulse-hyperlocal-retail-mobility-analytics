@@ -1,0 +1,125 @@
+version: 2
+
+models:
+  - name: fct_hourly_store_activity
+    description: "Hourly aggregated observation pings and distinct devices per store and calendar date in Asia/Kolkata local time."
+    columns:
+      - name: store_id
+        description: "Store candidate identifier."
+        tests:
+          - not_null
+      - name: store_name
+        description: "Store candidate name."
+        tests:
+          - not_null
+      - name: calendar_date
+        description: "Local calendar date."
+        tests:
+          - not_null
+      - name: hour_of_day
+        description: "Hour of day (0-23) in Indian Standard Time."
+        tests:
+          - not_null
+      - name: distinct_device_count
+        description: "Number of unique synthetic devices observed in the store catchment during the hour."
+        tests:
+          - not_null
+      - name: ping_count
+        description: "Total observation pings in the store catchment during the hour."
+        tests:
+          - not_null
+
+  - name: fct_store_time_of_day_activity
+    description: "Diurnal daypart aggregated observation pings and distinct devices per store (morning, afternoon, evening, night)."
+    columns:
+      - name: store_id
+        description: "Store candidate identifier."
+        tests:
+          - not_null
+      - name: store_name
+        description: "Store candidate name."
+        tests:
+          - not_null
+      - name: time_of_day
+        description: "Diurnal daypart period."
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['morning', 'afternoon', 'evening', 'night']
+      - name: distinct_device_count
+        description: "Unique synthetic devices observed during the diurnal period."
+        tests:
+          - not_null
+      - name: ping_count
+        description: "Total observation pings during the diurnal period."
+        tests:
+          - not_null
+
+  - name: fct_daily_store_summary
+    description: "Daily summary metrics per store including active observation hours and visit intensity."
+    columns:
+      - name: store_id
+        description: "Store candidate identifier."
+        tests:
+          - not_null
+      - name: store_name
+        description: "Store candidate name."
+        tests:
+          - not_null
+      - name: calendar_date
+        description: "Local calendar date."
+        tests:
+          - not_null
+      - name: distinct_devices
+        description: "Unique devices observed within the store catchment on that date."
+        tests:
+          - not_null
+      - name: ping_count
+        description: "Total observation pings within the store catchment on that date."
+        tests:
+          - not_null
+      - name: active_hours_count
+        description: "Count of distinct hours with at least one recorded ping."
+        tests:
+          - not_null
+      - name: pings_per_device
+        description: "Average ping observations per unique device (visit intensity)."
+        tests:
+          - not_null
+
+  - name: fct_store_overlap_summary
+    description: "Store-level catchment exclusivity and multi-catchment overlap metrics across the network."
+    columns:
+      - name: store_id
+        description: "Store candidate identifier."
+        tests:
+          - not_null
+      - name: store_name
+        description: "Store candidate name."
+        tests:
+          - not_null
+      - name: total_pings
+        description: "Total matched pings in the store's catchment buffer."
+        tests:
+          - not_null
+      - name: exclusive_pings
+        description: "Pings falling strictly within this store's catchment buffer."
+        tests:
+          - not_null
+      - name: overlapping_pings
+        description: "Pings falling within this store's buffer that also intersect one or more neighboring catchments."
+        tests:
+          - not_null
+      - name: total_devices
+        description: "Distinct devices observed in this store's catchment buffer."
+        tests:
+          - not_null
+      - name: exclusive_devices
+        description: "Devices observed exclusively at this store across their entire simulated trajectory."
+        tests:
+          - not_null
+      - name: multi_catchment_devices
+        description: "Devices observed at this store whose trajectories also traversed neighboring catchments."
+        tests:
+          - not_null
