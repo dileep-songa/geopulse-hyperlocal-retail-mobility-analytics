@@ -559,41 +559,66 @@ To maintain academic and professional standards, the following technical constra
 
 ---
 
-## 13. Git Status and Working Tree Verification
+## 13. Git Status and Working Tree Verification (At Completion Audit)
+
+During the final technical closure audit prior to repository publication, the working tree was verified clean with the dbt implementation staged locally:
 
 ```powershell
-git status --short --branch
+git status -sb
 ```
 ```text
 ## main...origin/main
-?? dbt/
 ```
 
-### Git Repository State
-- **Branch**: `main` (synchronized with `origin/main` at commit `e42cda4`).
-- **HEAD Commit**: `e42cda4 feat: implement retail mobility analytics`.
-- **Tracked Files Modified**: **0** (all prior source and test files remain completely clean).
-- **Untracked Directory**: `dbt/` (contains tested dbt project, models, tests, and configuration).
-- **Committed Week 2 Deliverables**:
+### Git Repository State Prior to dbt Publication
+- **Branch**: `main` (synchronized with `origin/main` at commit `f973210`).
+- **Prior Milestone Commit**: `f973210 docs: finalize Week 2 Snowflake ELT validation`.
+- **Tracked Files Clean**: Zero unstaged or uncommitted tracked modifications.
+- **Deliverables Verified**:
   - `data/reference/synthetic_store_locations.csv`
   - `src/spatial_analysis.py`
   - `src/retail_mobility_analytics.py`
   - `tests/test_spatial_analysis.py`
   - `tests/test_retail_mobility_analytics.py`
-- **Data Protection**: Output directories under `data/processed/` are gitignored per `.gitignore` rule (`data/processed/*` except `.gitkeep`).
-- **Preservation**: In strict accordance with execution instructions, no staging, commits, or pushes were performed.
+- **Data Protection**: Local output directories under `data/processed/` are gitignored per `.gitignore` (`data/processed/*` except `.gitkeep`).
 
 ---
 
-## 14. Conclusion & Week 3 Roadmap
+## 14. Post-Completion Repository Publication
 
-Week 2 successfully developed, tested, and verified the complete geospatial and retail mobility analytics layer of GeoPulse across both distributed PySpark computing and Snowflake cloud data warehousing. The dual implementation confirms identical spatial and dimensional modeling results:
-- 163 automated Python unit/integration tests passing.
-- 6 dbt models materialized (2 views, 4 tables).
-- 65 dbt tests passing with 0 failures or warnings.
-- 100% exact numerical and relational parity across all four commercial retail marts.
+Following formal verification of the analytical marts and test suites, the 24 genuine dbt source files were published to the remote repository in a dedicated, atomic commit:
 
-### Next Steps (Week 3 Roadmap):
+- **Repository**: `dileep-songa/geopulse-hyperlocal-retail-mobility-analytics`
+- **Branch**: `main`
+- **Publication Commit SHA**: `0d59a52ff1f4eec46b7177a0fff0cf4a8aed56b2`
+- **Commit Message**: `feat(dbt): add Snowflake ELT models and analytics marts`
+- **Source Files Published (24 files)**:
+  - Project configuration: `dbt_project.yml`, `README.md`, `.gitignore`
+  - Directory placeholders: `analyses/.gitkeep`, `macros/.gitkeep`, `seeds/.gitkeep`, `snapshots/.gitkeep`, `tests/.gitkeep`
+  - SQL models (6): `stg_store_catchment_memberships.sql`, `int_store_memberships_overlap_tagged.sql`, `fct_hourly_store_activity.sql`, `fct_store_time_of_day_activity.sql`, `fct_daily_store_summary.sql`, `fct_store_overlap_summary.sql`
+  - YAML specifications (4): `_sources.yml`, `stg_store_catchment_memberships.yml`, `int_store_memberships_overlap_tagged.yml`, `marts.yml`
+  - Singular SQL data tests (6): `assert_unique_ping_store_membership.sql`, `assert_fct_hourly_activity_row_count.sql`, `assert_fct_store_time_of_day_row_count.sql`, `assert_fct_daily_store_summary_row_count.sql`, `assert_fct_store_overlap_row_count.sql`, `assert_store_overlap_reconciliation.sql`
+- **Excluded Generated Artifacts & Credentials**:
+  - Compiled and run targets (`target/*`, 156 files) excluded via `.gitignore`.
+  - Local execution logs (`logs/*.log`, `dbt/logs/dbt.log`, `dbt/geopulse_analytics/logs/dbt.log`) excluded.
+  - Snowflake credentials and profile (`~/.dbt/profiles.yml`) strictly preserved outside version control.
+
+### Distinction Between Validation State and Publication State
+The local validation and metric reconciliation were executed against `COMPUTE_WH` on Snowflake and verified prior to publication. The subsequent publication step transitioned the project from local-only dbt code to a published, version-controlled repository state without altering the verified data, analytical logic, or test outcomes.
+
+---
+
+## 15. Conclusion & Week 3 Roadmap
+
+Week 1 (Synthetic Telemetry Engine & Snowflake Storage Foundation) and Week 2 (Spatial Catchment Analytics & Snowflake dbt ELT Marts) are **formally complete, reconciled, and published**. Week 3 has **not yet started**.
+
+### Summary of Completed Milestones
+- **Week 1**: 10,000 synthetic mobility observations generated across 500 devices with zero PII; Snowflake warehouse and spatial point tables verified; 65 Python data quality tests passing.
+- **Week 2 (PySpark/Sedona)**: 4 candidate store locations, 500-metre planar metric catchments (UTM Zone 43N), 4,051 matched memberships, and baseline retail analytics CSV datasets generated.
+- **Week 2 (Snowflake & dbt)**: 6 dbt models materialized (2 views, 4 tables), 65 dbt tests passing (0 failures, 0 errors), and 100% exact numerical metric parity against PySpark baseline outputs.
+- **Total Automated Test Suite**: 163 Python tests + 65 dbt tests = **228 automated tests passing**.
+
+### Next Steps (Week 3 Roadmap — Not Started):
 1. **Interactive Geospatial Visualization**: Connect Kepler.gl and Streamlit/React dashboards to the verified Snowflake marts and spatial catchment geometries.
 2. **Dwell Time & Stay-Point Analytics**: Implement spatial clustering and temporal dwell-time algorithms to distinguish transient transit from lingering store visits.
 3. **Automated CI/CD Pipeline**: Package dbt test execution and PySpark validation into automated GitHub Actions workflows.

@@ -8,7 +8,7 @@
 | **Domain** | Retail Strategy, Geospatial Engineering, and Urban Mobility Analytics |
 | **Repository** | `https://github.com/dileep-songa/geopulse-hyperlocal-retail-mobility-analytics` |
 | **Author / Lead** | Dileep Songa (Internship Project) |
-| **Project Stage** | Week 1: Synthetic Telemetry Engine (Day 1 & Day 2 Complete; Day 3 Pending) |
+| **Project Stage** | **Week 2 complete — data foundation, spatial analytics and dbt ELT delivered. Week 3 not started.** |
 | **Target Audience** | Data Engineering Evaluators, Geospatial Architects, Retail Analytics Leads |
 
 ---
@@ -39,115 +39,150 @@ By coupling synthetic data simulation with modern data engineering tooling:
 
 ## 4. Objectives
 
-### 4.1 Engineering Objectives
-- **Scalable Ingestion & Transformation**: Process millions of synthetic mobility points using distributed spatial partitioning (KDB-Tree / R-Tree) in Apache Sedona.
-- **Standardized Cloud Storage**: Structure a Snowflake warehouse leveraging native `GEOGRAPHY` objects, spatial functions (`ST_CONTAINS`, `ST_DWITHIN`), and micro-partition clustering.
-- **Automated Data Quality & Lineage**: Implement dbt models with comprehensive test coverage (uniqueness, referential integrity, spatial validity assertions).
-- **Production Orchestration**: Orchestrate data generation, Spark jobs, Snowflake staging, and dbt runs via declarative Apache Airflow DAGs.
+### 4.1 Completed Engineering & Analytical Objectives (Weeks 1 & 2)
 
-### 4.2 Analytical Objectives
-- **Catchment Identification**: Formulate dynamic retail trade catchments (isochrones and convex/concave hulls) based on simulated pedestrian travel distances.
-- **Cannibalization Modeling**: Measure the geometric and volume-weighted intersection between overlapping trade areas of neighboring brand units.
-- **Footfall & Dwell Dynamics**: Calculate hourly, daily, and diurnal foot traffic density curves and median dwell times across commercial zones.
+- **Deterministic Synthetic Telemetry Engine (Week 1)**:
+  - Generates 10,000 synthetic GPS observations for 500 simulated devices within Indiranagar, Bengaluru ($[77.6250, 77.6550]^\circ\text{E}, [12.9650, 12.9900]^\circ\text{N}$) with velocity-bounded kinematics, diurnal curves, and dwell anchoring under deterministic seed `42`.
+- **Independent Data Quality Validation Engine (Week 1)**:
+  - Strict canonical schema enforcement (8 columns), geodetic boundary assertions, velocity anomaly detection, and identifier uniqueness. Verified via 36 unit tests.
+- **Cloud Warehousing Infrastructure & Ingestion (Week 1 & 2)**:
+  - Structured Snowflake warehouse (`GEOPULSE_DB`) with dedicated schemas (`RAW`, `STAGING`, `ANALYTICS`), file format, and internal stage. Ingested raw observations via `COPY INTO` and generated native `GEOGRAPHY` point geometries.
+- **Distributed Spatial Catchment Processing (Week 2)**:
+  - Projected geodetic coordinates into UTM Zone 43N (`EPSG:32643`) for planar metric accuracy.
+  - Constructed 500-metre regular 32-gon buffer polygons around 4 hypothetical candidate retail stores (area ~780,361.29 m²; $ST\_IsValid = \text{true}$).
+  - Executed spatial point-in-polygon containment joins via Apache Sedona/PySpark, matching exactly 4,051 memberships across 3,956 unique observations and 350 devices.
+- **PySpark Retail Mobility Analytics (Week 2)**:
+  - Converted UTC timestamps to Indian Standard Time (`Asia/Kolkata`, UTC+05:30), evaluated 4 diurnal dayparts (`morning`, `afternoon`, `evening`, `night`), and produced baseline CSV datasets across 81 store-hours, 16 store-diurnals, 8 store-days, and 4 store exclusivity summaries.
+- **Snowflake dbt ELT Dimensional Modeling (Week 2)**:
+  - Authored and materialized 6 dbt models in `GEOPULSE_DB.ANALYTICS`: 2 views (`stg_store_catchment_memberships`, `int_store_memberships_overlap_tagged`) and 4 dimensional tables (`fct_hourly_store_activity`, `fct_store_time_of_day_activity`, `fct_daily_store_summary`, `fct_store_overlap_summary`).
+  - Isolated multi-catchment overlap flags with zero Cartesian fan-out (preserved exact 4,051 membership grain).
+- **Exact Cross-Platform Parity Verification (Week 2)**:
+  - Verified 100% exact numerical and relational parity (`max_abs_diff = 0.0`) between Snowflake dbt tables and PySpark baseline CSVs across all rows, dimensions, and metrics.
+- **Comprehensive Automated Testing (Weeks 1 & 2)**:
+  - 163 Python unit/integration tests passing in 1.21s (0 failures, 0 errors).
+  - 65 dbt tests passing in 73.84s (10 source, 49 schema, 6 singular integration tests).
+  - Total automated verification suite: **228 automated tests passing**.
+
+### 4.2 Remaining & Planned Objectives (Weeks 3–6 — Not Started)
+
+- **Interactive Geospatial Visualization (Planned — Week 3)**:
+  - Build an exploratory web dashboard utilizing React, Kepler.gl, and Streamlit to render dynamic 3D heatmaps, animated trip playback, and alpha-blended catchment overlap corridors.
+- **Advanced Dwell-Time & Stay-Point Classification (Planned — Week 4)**:
+  - Implement temporal clustering algorithms to distinguish transient transit traffic from lingering physical retail store visits based on dwell duration thresholds.
+- **Pedestrian-Network Isochrone Modeling (Planned — Week 4)**:
+  - Incorporate OpenStreetMap street network routing to construct realistic walking-distance and travel-time isochrones rather than circular planar buffers.
+- **Production Pipeline Orchestration (Planned — Week 5/6)**:
+  - Author Apache Airflow DAGs to automate synthetic data generation, Sedona processing, Snowflake staging, and dbt transformation runs with retry policies and SLA alerting.
 
 ---
 
 ## 5. Functional Scope
 
-### 5.1 In-Scope
+### 5.1 Completed Scope (Weeks 1 & 2)
 - **Synthetic Mobility Simulation**:
-  - Configurable spatial bounding boxes (commercial urban districts; Week 1 baseline: Indiranagar, Bengaluru).
-  - Plausible kinematic models (pedestrian walking speeds, vehicular transit speeds, dwell stop points, and predictive boundary steering).
-  - Injection of realistic GPS measurement variance (simulated horizontal accuracy radius).
-  - *Planned Refinements*: OpenStreetMap road network graph routing and gravity interaction models in subsequent phases.
+  - Deterministic Python simulation engine (`src/data_generator.py`) generating 10,000 pings across 500 devices.
+  - Configurable bounding box over Indiranagar, Bengaluru ($[77.6250, 77.6550]^\circ\text{E}, [12.9650, 12.9900]^\circ\text{N}$).
+  - Velocity-bounded kinematics (walking 0.8–1.6 m/s, transit 3.5–14.0 m/s, dwell $\le 0.30$ m/s), dwell anchoring, and predictive boundary reflection.
+- **Data Quality & Validation**:
+  - Independent validation module (`src/data_quality.py`) with 36 automated unit tests.
+  - Strict 8-column schema conformance, UUIDv4 uniqueness, coordinate range bounds, and temporal sequence validation.
 - **Spatial Data Engineering**:
-  - Spatial indexing via H3 discrete global grid system or Geohash.
-  - Point-in-polygon spatial containment joining simulated telemetry against retail building polygons.
-- **Warehouse & Transformation Pipeline**:
-  - Medallion architecture (Bronze -> Silver -> Gold) inside Snowflake.
-  - dbt-managed dimensional modeling (facts, dimensions, spatial summary marts).
-- **Interactive Visualization**:
-  - Standalone React application integrating Kepler.gl for 3D spatial rendering, trajectory playback, and catchment overlap exploration.
-- **Workflow Orchestration**:
-  - Airflow DAG definitions for automated execution, backfill management, and pipeline health monitoring.
+  - Planar coordinate projection from WGS 84 (`EPSG:4326`) to UTM Zone 43N (`EPSG:32643`).
+  - Metric 500-metre circular buffer generation (32-sided regular polygon) around 4 candidate store centroids.
+  - Point-in-polygon containment joins and Euclidean distance calculations via Apache Sedona/PySpark.
+- **Cloud Warehousing & dbt ELT Modeling**:
+  - Snowflake database, stage, and table provisioning (`GEOPULSE_DB`).
+  - Staging view (`stg_store_catchment_memberships`) with IST timestamp conversion and diurnal classification.
+  - Intermediate view (`int_store_memberships_overlap_tagged`) with independent ping- and device-overlap tagging.
+  - Four commercial retail marts (`fct_hourly_store_activity`, `fct_store_time_of_day_activity`, `fct_daily_store_summary`, `fct_store_overlap_summary`).
+  - 65 dbt tests enforcing schema integrity, referential constraints, and reconciliation invariants.
 
-### 5.2 Out-of-Scope
+### 5.2 Planned Future Scope (Weeks 3–6 — Not Started)
+- Interactive web frontend (React + Kepler.gl / Streamlit).
+- Graph routing and walking isochrones via OpenStreetMap (OSM) street networks.
+- Spatial clustering algorithms for dwell-point extraction.
+- End-to-end Apache Airflow workflow orchestration.
+
+### 5.3 Out-of-Scope (All Phases)
 - Ingestion of real-world consumer cellular telemetry, Call Detail Records (CDRs), or real Mobile Advertising IDs (MAIDs).
 - Integration with live commercial point-of-sale (POS) transactional hardware or enterprise ERP backends.
 - Real-time sub-second streaming inference (the project focuses on high-throughput micro-batch and scheduled analytical pipelines).
-- Multi-million-dollar proprietary commercial street network licensing (open-source OpenStreetMap data is utilized).
+- Multi-million-dollar proprietary commercial street network licensing.
 
 ---
 
-## 6. Technology Stack
+## 6. Technology Stack & Operational Status
 
-| Layer | Component | Version / Tool | Purpose in GeoPulse |
-| :--- | :--- | :--- | :--- |
-| **Language** | Python | 3.10+ | Core trajectory generator, geometric processing scripts, pipeline coordination |
-| **Distributed Spatial** | PySpark & Sedona | Spark 3.4+ / Sedona 1.5+ | Distributed spatial indexing, trajectory segmentation, point-in-polygon joins |
-| **Data Warehouse** | Snowflake | Standard Edition | Cloud analytical store, spatial SQL processing, micro-partition clustering |
-| **Transformation** | dbt | dbt-core / dbt-snowflake | Modularity, testing, documentation, dimensional modeling |
-| **Presentation** | Kepler.gl & React | React 18+ / Kepler.gl | High-performance GPU-accelerated spatial visualization and map layers |
-| **Orchestration** | Apache Airflow | Airflow 2.8+ | Dependency management, workflow scheduling, task failure recovery |
-| **Environment & QA** | Git, Pytest, EditorConfig | Git / GitHub | Version control, branch isolation, automated test assertions |
+| Layer | Component | Target Tool | Operational Status | Role in GeoPulse |
+| :--- | :--- | :--- | :--- | :--- |
+| **Language** | Python | 3.12+ | **Implemented (Weeks 1 & 2)** | Synthetic trajectory generation, data quality validation, unit testing, and analytical verification |
+| **Distributed Spatial** | PySpark & Sedona | Spark 3.5+ / Sedona 1.9+ | **Implemented (Week 2)** | Distributed planar projection (UTM 43N), 500m buffer generation, and spatial point-in-polygon joins |
+| **Data Warehouse** | Snowflake | Standard Edition | **Implemented (Weeks 1 & 2)** | Cloud analytical store, native `GEOGRAPHY` point modeling, raw landing tables, and analytics schema |
+| **Transformation** | dbt | dbt-core 1.12.7 / dbt-snowflake 1.12.5 | **Implemented (Week 2)** | Modular dimensional modeling (2 views, 4 tables), schema testing, and cross-platform metric validation |
+| **Presentation** | Kepler.gl & React | React 18+ / Kepler.gl | *Planned (Week 3 — Not Started)* | High-performance GPU-accelerated spatial visualization and interactive dashboard |
+| **Orchestration** | Apache Airflow | Airflow 2.8+ | *Planned (Week 5/6 — Not Started)* | Automated pipeline execution, dependency DAGs, backfill management, and alerting |
+| **Environment & QA** | Git, Pytest, EditorConfig | Git / GitHub | **Implemented (Weeks 1 & 2)** | Version control, branch isolation, automated test assertions (228 automated tests passing) |
 
 ---
 
 ## 7. Data Governance and Ethics
 
-1. **Synthetic Data Policy**:
+1. **100% Synthetic Data Policy**:
    - Every coordinate, timestamp, device identifier, and trajectory attribute is generated algorithmically.
    - The dataset contains zero records derived from physical mobile devices, telemetry aggregators, or individual tracking.
 2. **Schema Contracts**:
-   - Upstream telemetry generators must produce strictly typed Parquet files adhering to documented schemas (`device_id` as UUID, `timestamp` as UTC ISO-8601, `latitude`/`longitude` in WGS 84).
+   - Upstream telemetry generators produce strictly typed CSV records adhering to documented schemas (`device_id` as UUID, `event_timestamp` as UTC ISO-8601, `latitude`/`longitude` in WGS 84).
 3. **Data Retention & Lifecycle**:
-   - Raw simulated telemetry files are temporary staging assets that can be regenerated on demand via deterministic random seeds.
-   - Gold analytical marts are materialized in Snowflake and cataloged through dbt docs.
+   - Raw simulated telemetry files are reproducible staging assets that can be regenerated on demand via deterministic random seed `42`.
+   - Gold analytical marts are materialized in Snowflake and cataloged through dbt models.
 
 ---
 
 ## 8. Expected Deliverables
 
-1. **Synthetic Telemetry Generator Engine**:
-   - Python-based simulation engine capable of generating deterministic mobility data with customizable volumes and urban bounding areas.
-2. **Distributed Spatial ETL Pipeline**:
-   - PySpark/Apache Sedona scripts executing distributed spatial joins against retail Points of Interest (POIs).
-3. **Snowflake Database & dbt Project**:
-   - Complete DDL, dimensional models, staging views, and test suites modeling retail footfall and catchment overlap.
-4. **Interactive Geospatial Dashboard**:
-   - React + Kepler.gl web application visualizing pedestrian density heatmaps and store cannibalization polygons.
-5. **Airflow Orchestration DAGs**:
-   - Fully documented Airflow workflows orchestrating simulation, processing, warehouse ingestion, and transformation tasks.
-6. **Technical Documentation & Final Report**:
-   - Architecture diagrams, data flow specifications, performance benchmarks, and executive summary reports.
+| Deliverable | Description | Status |
+| :--- | :--- | :--- |
+| **1. Synthetic Telemetry Generator Engine** | Python simulation engine generating deterministic mobility data with customizable volumes and urban bounding areas (`src/data_generator.py`). | **Delivered (Week 1)** |
+| **2. Data Quality & Validation Engine** | Automated validation module asserting schema compliance, geodetic boundaries, and kinematic velocities (`src/data_quality.py`). | **Delivered (Week 1)** |
+| **3. Distributed Spatial Computing Pipeline** | PySpark/Apache Sedona scripts executing planar projection (EPSG:32643) and 500m buffer joins (`src/spatial_analysis.py`). | **Delivered (Week 2)** |
+| **4. Retail Mobility Analytics Engine** | PySpark analytical engine calculating hourly activity, diurnal patterns, daily summaries, and overlap distributions (`src/retail_mobility_analytics.py`). | **Delivered (Week 2)** |
+| **5. Snowflake Database & dbt Project** | Complete Snowflake infrastructure, 6 dbt models (2 views, 4 tables), and 65 automated dbt tests (`dbt/geopulse_analytics/`). | **Delivered (Week 2)** |
+| **6. Interactive Geospatial Dashboard** | React + Kepler.gl / Streamlit web application visualizing pedestrian density heatmaps and store catchment polygons. | *Planned (Week 3 — Not Started)* |
+| **7. Airflow Orchestration DAGs** | Production Airflow workflows orchestrating simulation, processing, warehouse ingestion, and transformation tasks. | *Planned (Week 5/6 — Not Started)* |
+| **8. Milestone Reports & Documentation** | Detailed milestone completion reports documenting engineering benchmarks, test evidence, and metric reconciliation. | **Delivered (Weeks 1 & 2)** |
 
 ---
 
-## 9. Limitations and Assumptions
+## 9. Project Limitations and Analytical Assumptions
 
-- **Behavioral Simplifications**: Simulated agents follow algorithmic movement heuristics (velocity-bounded random walks with dwell anchoring and predictive boundary steering); complex real-world human deviations (e.g., flash gatherings or sudden transit diversions) and micro-traffic vehicle physics are not represented.
-- **Predictive Boundary Steering**: Boundary turnaround steering is an algorithmic simulation rule to keep generated agents within the study envelope, not physical road navigation.
-- **Synthetic Data Baseline**: No observed human footfall or real-world consumer transactions are measured; all outputs represent synthetic simulations for engineering evaluation.
-- **Compute Sizing**: The architecture is designed to run efficiently on developer workstations and cost-effective single-cluster cloud environments.
-- **Spatial Resolution**: Trajectories and spatial polygons are normalized using WGS 84 (`EPSG:4326`) and H3 discrete spatial binning (resolutions 8 to 10).
+- **Synthetic Trajectory Heuristics**: The generator models agent motion via velocity-bounded random walks with dwell anchoring and predictive boundary steering; it does not simulate physical road-network turn restrictions or multi-agent traffic congestion.
+- **Predictive Boundary Steering**: Boundary reflection is an algorithmic simulation rule to keep generated agents within the study envelope, not physical vehicular navigation.
+- **Synthetic Baseline vs. Real Demand**: No observed human footfall or real-world consumer transactions are measured; all outputs represent synthetic simulations for engineering evaluation.
+- **Spatial Proximity vs. Store Visits**: Catchment membership denotes geometric presence within a 500-metre planar radius, not physical commercial entry, verified dwell, or retail purchases.
+- **Catchment Overlap vs. Cannibalization**: Multi-catchment observations indicate shared geographic proximity between adjacent buffers, not brand switching, shared customer loyalty, or commercial cannibalization.
+- **Planar Buffer Approximation**: Catchments are planar circular buffers in UTM Zone 43N (`EPSG:32643`), not street-network walking isochrones or building-constrained footprints.
 
 ---
 
-## 10. Incremental Development Methodology
-
-The project follows a structured six-week milestone framework, ensuring continuous verification and rigorous engineering quality:
+## 10. Incremental Development Methodology & Current Milestones
 
 ```mermaid
 flowchart TD
-    W0["Phase 0: Repository Initialization<br/>(Git, Governance, Architecture Setup)"] --> W1["Week 1: Synthetic Telemetry Engine<br/>(Kinematic Simulation & Schema Enforcement)"]
-    W1 --> W2["Week 2: Distributed Spatial Processing<br/>(PySpark, Apache Sedona, H3 Indexing)"]
-    W2 --> W3["Week 3: Cloud Warehousing & Ingestion<br/>(Snowflake GEOGRAPHY & Staging Architecture)"]
-    W3 --> W4["Week 4: dbt Dimensional Modeling<br/>(Footfall, Catchments & Cannibalization Marts)"]
-    W4 --> W5["Week 5: Interactive Visual Analytics<br/>(Kepler.gl, React & Spatial Map Layers)"]
-    W5 --> W6["Week 6: Airflow Orchestration & CI/CD<br/>(End-to-End Pipeline, Benchmarks & Final Delivery)"]
+    W0["Phase 0: Repository Initialization<br/>(Git, Governance, Architecture Setup)<br/><b>[Complete]</b>"] --> W1["Week 1: Synthetic Telemetry & Warehouse Foundation<br/>(Kinematics, Schema Validation, Snowflake Setup)<br/><b>[Complete]</b>"]
+    W1 --> W2["Week 2: Spatial Catchments & dbt ELT Marts<br/>(Sedona Buffering, PySpark Analytics, dbt Marts)<br/><b>[Complete]</b>"]
+    W2 --> W3["Week 3: Interactive Visual Analytics<br/>(Kepler.gl, React / Streamlit Spatial Dashboard)<br/><b>[Not Started]</b>"]
+    W3 --> W4["Week 4: Dwell-Time & Isochrone Analytics<br/>(Spatial Clustering & Walking-Reach Modeling)<br/><b>[Not Started]</b>"]
+    W4 --> W5["Week 5: Pipeline Orchestration & CI/CD<br/>(Apache Airflow DAGs & Automated Workflows)<br/><b>[Not Started]</b>"]
 ```
 
-### Milestone Quality Gates:
-- Each development week requires strict unit/integration testing before graduation.
-- No code will be merged or progressed without test assertions and documentation updates.
-- All secrets and cloud access credentials remain externalized via environment configurations.
+### Current Milestone Status Table
+
+| Milestone | Target Scope | Status | Verification & Deliverables |
+| :--- | :--- | :---: | :--- |
+| **Phase 0** | Repository Initialization & Architecture | **Complete** | Git setup, `.editorconfig`, `.gitignore`, `docs/PROJECT_CHARTER.md`, `docs/TECHNICAL_OVERVIEW.md` |
+| **Week 1** | Synthetic Telemetry Engine & Snowflake Foundation | **Complete** | 10,000 pings, 500 devices, seed 42, `src/data_generator.py`, `src/data_quality.py`, Snowflake DDL, 65 Python tests |
+| **Week 2** | Spatial Catchment Analytics & Snowflake dbt ELT Marts | **Complete** | Sedona 500m planar buffers, 4,051 memberships, PySpark analytics, 6 dbt models, 4 marts, 65 dbt tests, 163 Python tests (228 total tests passing), 100% Spark-to-Snowflake metric reconciliation |
+| **Week 3** | Interactive Geospatial Visualization & Dashboard | **Not Started** | Kepler.gl / React web application, trajectory playback, catchment overlap exploration |
+| **Week 4** | Advanced Dwell-Time & Isochrone Analytics | **Not Started** | Spatial dwell clustering, street-network walking isochrones |
+| **Week 5** | Airflow Orchestration & Pipeline Automation | **Not Started** | Apache Airflow DAGs, automated data pipelines, SLA monitoring |
+| **Week 6** | End-to-End Hardening, Benchmarking & Final Delivery | **Not Started** | Comprehensive performance benchmarks, final capstone presentation |
