@@ -140,3 +140,7 @@ package-lock.json.bak
 # --- Logs & Telemetry Dumps ---
 *.log
 logs/
+
+# --- Hadoop Windows Shim Build Artifacts ---
+tools/shims/*.jar
+tools/shims/classes/

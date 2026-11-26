@@ -17,10 +17,13 @@ without requiring a live PySpark or Sedona JVM session.
 """
 
 import csv
+import hashlib
 import math
+import os
 from pathlib import Path
 import tempfile
 import unittest
+from unittest import mock
 
 from src.config import DATA_PROVENANCE_TAG, MovementMode, STUDY_AREA
 from src.spatial_analysis import (
@@ -29,17 +32,21 @@ from src.spatial_analysis import (
     DEFAULT_SOURCE_CRS,
     EXPECTED_STORE_COUNT,
     MOBILITY_CSV_COLUMNS,
+    SEDONA_SHADED_JAR_NAME,
+    SEDONA_SHADED_JAR_SHA256,
     STORE_CSV_COLUMNS,
     SpatialAnalysisConfig,
     calculate_overlap_distribution,
     calculate_polygon_buffer_area,
     calculate_theoretical_circle_area,
+    compute_file_sha256,
     find_sedona_jars,
     validate_catchment_area,
     validate_catchment_radius,
     validate_mobility_csv,
     validate_mobility_record,
     validate_mobility_schema,
+    validate_sedona_jar_checksum,
     validate_store_records,
     write_spark_csv_output,
 )
@@ -562,10 +569,193 @@ class TestSpatialAnalysisConfig(unittest.TestCase):
 class TestSedonaJarDiscovery(unittest.TestCase):
     """Test Sedona JAR discovery helper."""
 
-    def test_find_sedona_jars_returns_list(self):
-        """Verify find_sedona_jars returns a list without raising exceptions."""
-        jars = find_sedona_jars()
-        self.assertIsInstance(jars, list)
+    def test_find_sedona_jars_constants(self):
+        """Verify Sedona shaded JAR constants match verified artifact specification."""
+        self.assertEqual(SEDONA_SHADED_JAR_NAME, "sedona-spark-shaded-3.5_2.12-1.9.1.jar")
+        self.assertEqual(
+            SEDONA_SHADED_JAR_SHA256,
+            "0EE2A6886D864C7E52D33B1A08208EFFC89E0778CE03FBE8B35F32E9C235611A",
+        )
+
+    def test_find_sedona_jars_selects_only_exact_1_9_1_shaded_jar(self):
+        """Verify discovery selects only the 1.9.1 shaded JAR and rejects 1.6.1 or component JARs."""
+        with tempfile.TemporaryDirectory() as tmp_home:
+            ivy_jars = Path(tmp_home) / ".ivy2" / "jars"
+            ivy_jars.mkdir(parents=True)
+
+            # Create various dummy jar files in simulated ivy cache
+            target_jar = ivy_jars / SEDONA_SHADED_JAR_NAME
+            target_jar.write_bytes(b"dummy 1.9.1 shaded content")
+
+            old_jar = ivy_jars / "org.apache.sedona_sedona-spark-shaded-3.5_2.12-1.6.1.jar"
+            old_jar.write_bytes(b"dummy 1.6.1 shaded content")
+
+            component_jar = ivy_jars / "org.apache.sedona_sedona-common-1.9.1.jar"
+            component_jar.write_bytes(b"dummy component content")
+
+            geotools_jar = ivy_jars / "geotools-wrapper-1.6.1-28.2.jar"
+            geotools_jar.write_bytes(b"dummy geotools content")
+
+            with mock.patch.dict(os.environ, {}, clear=False):
+                os.environ.pop("SEDONA_JARS", None)
+                with mock.patch("pathlib.Path.home", return_value=Path(tmp_home)):
+                    with mock.patch("src.spatial_analysis.compute_file_sha256", return_value=SEDONA_SHADED_JAR_SHA256):
+                        jars = find_sedona_jars()
+                        self.assertEqual(len(jars), 1)
+                        self.assertEqual(jars[0], str(target_jar.resolve()))
+                        self.assertNotIn(str(old_jar.resolve()), jars)
+                        self.assertNotIn(str(component_jar.resolve()), jars)
+                        self.assertNotIn(str(geotools_jar.resolve()), jars)
+
+    def test_find_sedona_jars_rejects_incorrect_checksum_in_ivy_cache(self):
+        """Verify discovery rejects Ivy cache JAR if SHA-256 integrity check fails."""
+        with tempfile.TemporaryDirectory() as tmp_home:
+            ivy_jars = Path(tmp_home) / ".ivy2" / "jars"
+            ivy_jars.mkdir(parents=True)
+
+            target_jar = ivy_jars / SEDONA_SHADED_JAR_NAME
+            target_jar.write_bytes(b"corrupted or wrong jar content")
+
+            with mock.patch.dict(os.environ, {}, clear=False):
+                os.environ.pop("SEDONA_JARS", None)
+                with mock.patch("pathlib.Path.home", return_value=Path(tmp_home)):
+                    with self.assertRaises(ValueError) as ctx:
+                        find_sedona_jars()
+                    self.assertIn("Sedona JAR integrity check failed", str(ctx.exception))
+
+    def test_find_sedona_jars_raises_when_target_missing(self):
+        """Verify discovery raises FileNotFoundError when 1.9.1 shaded JAR is missing."""
+        with tempfile.TemporaryDirectory() as tmp_home:
+            ivy_jars = Path(tmp_home) / ".ivy2" / "jars"
+            ivy_jars.mkdir(parents=True)
+
+            # Only old and component jars exist
+            old_jar = ivy_jars / "org.apache.sedona_sedona-spark-shaded-3.5_2.12-1.6.1.jar"
+            old_jar.write_bytes(b"dummy 1.6.1 shaded content")
+
+            component_jar = ivy_jars / "org.apache.sedona_sedona-common-1.9.1.jar"
+            component_jar.write_bytes(b"dummy component content")
+
+            with mock.patch.dict(os.environ, {}, clear=False):
+                os.environ.pop("SEDONA_JARS", None)
+                with mock.patch("pathlib.Path.home", return_value=Path(tmp_home)):
+                    with self.assertRaises(FileNotFoundError) as ctx:
+                        find_sedona_jars()
+                    self.assertIn(SEDONA_SHADED_JAR_NAME, str(ctx.exception))
+
+    def test_find_sedona_jars_valid_env_override(self):
+        """Verify find_sedona_jars accepts a valid SEDONA_JARS override pointing to the exact JAR with matching checksum."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            valid_jar = Path(tmp_dir) / SEDONA_SHADED_JAR_NAME
+            valid_jar.write_bytes(b"valid jar bytes")
+
+            with mock.patch.dict(os.environ, {"SEDONA_JARS": str(valid_jar)}):
+                with mock.patch("src.spatial_analysis.compute_file_sha256", return_value=SEDONA_SHADED_JAR_SHA256):
+                    jars = find_sedona_jars()
+                    self.assertEqual(jars, [str(valid_jar.resolve())])
+
+    def test_find_sedona_jars_invalid_env_override_wrong_checksum(self):
+        """Verify find_sedona_jars rejects SEDONA_JARS override if file contents do not match expected SHA-256."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tampered_jar = Path(tmp_dir) / SEDONA_SHADED_JAR_NAME
+            tampered_jar.write_bytes(b"tampered content with bad hash")
+
+            with mock.patch.dict(os.environ, {"SEDONA_JARS": str(tampered_jar)}):
+                with self.assertRaises(ValueError) as ctx:
+                    find_sedona_jars()
+                self.assertIn("Sedona JAR integrity check failed", str(ctx.exception))
+
+    def test_find_sedona_jars_invalid_env_override_wrong_filename(self):
+        """Verify find_sedona_jars rejects SEDONA_JARS override with incorrect artifact name."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            wrong_jar = Path(tmp_dir) / "sedona-spark-shaded-3.5_2.12-1.6.1.jar"
+            wrong_jar.write_bytes(b"dummy 1.6.1 content")
+
+            with mock.patch.dict(os.environ, {"SEDONA_JARS": str(wrong_jar)}):
+                with self.assertRaises(ValueError) as ctx:
+                    find_sedona_jars()
+                self.assertIn("file name must be exactly", str(ctx.exception))
+
+    def test_find_sedona_jars_invalid_env_override_multiple_files(self):
+        """Verify find_sedona_jars rejects SEDONA_JARS override with multiple files."""
+        multiple = f"file1.jar{os.pathsep}file2.jar"
+        with mock.patch.dict(os.environ, {"SEDONA_JARS": multiple}):
+            with self.assertRaises(ValueError) as ctx:
+                find_sedona_jars()
+            self.assertIn("must specify exactly one JAR file", str(ctx.exception))
+
+    def test_find_sedona_jars_invalid_env_override_missing_file(self):
+        """Verify find_sedona_jars rejects SEDONA_JARS override when file does not exist on disk."""
+        nonexistent = str(Path(tempfile.gettempdir()) / "nonexistent_dir" / SEDONA_SHADED_JAR_NAME)
+        with mock.patch.dict(os.environ, {"SEDONA_JARS": nonexistent}):
+            with self.assertRaises(FileNotFoundError) as ctx:
+                find_sedona_jars()
+            self.assertIn("not found or not a regular file", str(ctx.exception))
+
+    def test_validate_sedona_jar_checksum_helper(self):
+        """Verify compute_file_sha256 and validate_sedona_jar_checksum helpers."""
+        with tempfile.NamedTemporaryFile(delete=False) as tf:
+            tf.write(b"Hello GeoPulse")
+            tf_path = Path(tf.name)
+        try:
+            expected = hashlib.sha256(b"Hello GeoPulse").hexdigest()
+            # Matching digest should succeed
+            verified = validate_sedona_jar_checksum(tf_path, expected)
+            self.assertEqual(verified.lower(), expected.lower())
+
+            # Mismatched digest should raise ValueError
+            with self.assertRaises(ValueError) as ctx:
+                validate_sedona_jar_checksum(tf_path, "0000000000000000000000000000000000000000000000000000000000000000")
+            self.assertIn("Sedona JAR integrity check failed", str(ctx.exception))
+        finally:
+            if tf_path.exists():
+                tf_path.unlink()
+
+
+class TestBenchmarkPreLaunchEnvironment(unittest.TestCase):
+    """Test Spark pre-launch environment configuration in benchmark harness."""
+
+    def test_configure_spark_pre_launch_converts_jars_to_file_uris(self):
+        """Verify --jars in PYSPARK_SUBMIT_ARGS uses file:/// URIs, avoiding Hadoop scheme 'C' error."""
+        from scripts.benchmark_100k import configure_spark_pre_launch_environment
+
+        test_jars = [r"C:\Users\test\.ivy2\jars\test-jar.jar"]
+        with mock.patch.dict(os.environ, {}, clear=False):
+            configure_spark_pre_launch_environment(extra_jars=test_jars)
+            submit_args = os.environ.get("PYSPARK_SUBMIT_ARGS", "")
+            self.assertIn("--jars", submit_args)
+            self.assertIn("file:///", submit_args)
+            self.assertNotIn("--jars C:", submit_args)
+
+    def test_configure_spark_pre_launch_configures_java_11(self):
+        """Verify process-level JAVA_HOME is configured to Java 11 and prepended to PATH."""
+        from scripts.benchmark_100k import configure_spark_pre_launch_environment
+
+        test_jars = [r"C:\test\sedona-spark-shaded-3.5_2.12-1.9.1.jar"]
+        with mock.patch.dict(os.environ, {"JAVA_HOME": "C:\\global\\jdk-17", "PATH": "C:\\Windows\\system32"}, clear=False):
+            configure_spark_pre_launch_environment(extra_jars=test_jars)
+            java_home = os.environ.get("JAVA_HOME", "")
+            path = os.environ.get("PATH", "")
+            self.assertIn("jdk-11", java_home)
+            self.assertTrue(path.startswith(str(Path(java_home) / "bin")))
+
+    def test_configure_spark_pre_launch_raises_if_java_11_missing(self):
+        """Verify configure_spark_pre_launch_environment raises FileNotFoundError if Java 11 or java.exe is missing."""
+        from scripts.benchmark_100k import configure_spark_pre_launch_environment
+
+        with mock.patch("pathlib.Path.is_file", return_value=False):
+            with self.assertRaises(FileNotFoundError) as ctx:
+                configure_spark_pre_launch_environment(extra_jars=["test.jar"])
+            self.assertIn("Required Java 11 installation not found", str(ctx.exception))
+
+    def test_configure_spark_pre_launch_raises_if_no_jars(self):
+        """Verify configure_spark_pre_launch_environment raises RuntimeError if no jars provided."""
+        from scripts.benchmark_100k import configure_spark_pre_launch_environment
+
+        with mock.patch("src.spatial_analysis.find_sedona_jars", return_value=[]):
+            with self.assertRaises(RuntimeError) as ctx:
+                configure_spark_pre_launch_environment(extra_jars=[])
+            self.assertIn("no verified Sedona JAR was provided or located", str(ctx.exception))
 
 
 if __name__ == "__main__":

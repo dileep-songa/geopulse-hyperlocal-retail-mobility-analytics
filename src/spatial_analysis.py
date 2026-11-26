@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import logging
 import math
 import os
@@ -449,37 +450,91 @@ def calculate_overlap_distribution(
 # Sedona Session Management
 # ==============================================================================
 
+SEDONA_SHADED_JAR_NAME = "sedona-spark-shaded-3.5_2.12-1.9.1.jar"
+SEDONA_SHADED_JAR_SHA256 = "0EE2A6886D864C7E52D33B1A08208EFFC89E0778CE03FBE8B35F32E9C235611A"
+
+
+def compute_file_sha256(file_path: Path, chunk_size: int = 65536) -> str:
+    """Compute cryptographic SHA-256 hex digest of a file using streaming reads."""
+    hasher = hashlib.sha256()
+    with open(file_path, "rb") as f:
+        while chunk := f.read(chunk_size):
+            hasher.update(chunk)
+    return hasher.hexdigest()
+
+
+def validate_sedona_jar_checksum(
+    jar_path: Path,
+    expected_sha256: str = SEDONA_SHADED_JAR_SHA256,
+) -> str:
+    """Validate that the given JAR file matches the expected SHA-256 checksum.
+
+    Raises:
+        ValueError: If the computed SHA-256 digest does not match expected_sha256.
+    Returns:
+        The verified lowercase hex digest string.
+    """
+    actual_hash = compute_file_sha256(jar_path)
+    if actual_hash.lower() != expected_sha256.lower():
+        raise ValueError(
+            f"Sedona JAR integrity check failed for '{jar_path}'.\n"
+            f"  Expected SHA-256: {expected_sha256.upper()}\n"
+            f"  Actual SHA-256:   {actual_hash.upper()}\n"
+            "Execution aborted to prevent running with modified, corrupted, or incompatible JAR."
+        )
+    return actual_hash
+
+
 def find_sedona_jars() -> List[str]:
-    """Locate Sedona and GeoTools shaded JARs required for PySpark spatial operations."""
-    # Check environment variable first
+    """Locate Sedona shaded JAR required for PySpark spatial operations.
+
+    Selects exclusively the verified Sedona 1.9.1 shaded artifact for Spark 3.5 / Scala 2.12:
+    `sedona-spark-shaded-3.5_2.12-1.9.1.jar`.
+    Validates that the file exists, has the exact required filename, and matches the verified SHA-256 checksum.
+    Raises FileNotFoundError or ValueError if missing, inaccessible, or invalid.
+    """
     env_jars = os.environ.get("SEDONA_JARS")
-    if env_jars:
-        return [j.strip() for j in env_jars.split(os.pathsep) if j.strip()]
+    if env_jars is not None:
+        raw_paths = [j.strip() for j in env_jars.split(os.pathsep) if j.strip()]
+        if len(raw_paths) != 1:
+            raise ValueError(
+                f"Invalid SEDONA_JARS override: must specify exactly one JAR file, got {len(raw_paths)} entries: {env_jars!r}"
+            )
+        override_path = Path(raw_paths[0])
+        if override_path.name != SEDONA_SHADED_JAR_NAME:
+            raise ValueError(
+                f"Invalid SEDONA_JARS override: file name must be exactly '{SEDONA_SHADED_JAR_NAME}', "
+                f"got '{override_path.name}'"
+            )
+        try:
+            if not override_path.is_file():
+                raise FileNotFoundError(
+                    f"SEDONA_JARS override file not found or not a regular file: '{override_path}'"
+                )
+        except OSError as exc:
+            raise FileNotFoundError(
+                f"SEDONA_JARS override file is inaccessible: '{override_path}': {exc}"
+            ) from exc
+
+        validate_sedona_jar_checksum(override_path, SEDONA_SHADED_JAR_SHA256)
+        return [str(override_path.resolve())]
 
     # Standard Ivy cache directory
     ivy_jars_dir = Path.home() / ".ivy2" / "jars"
+    target_jar = ivy_jars_dir / SEDONA_SHADED_JAR_NAME
     try:
-        if not ivy_jars_dir.exists():
-            return []
+        if not target_jar.is_file():
+            raise FileNotFoundError(
+                f"Required Sedona 1.9.1 shaded JAR '{SEDONA_SHADED_JAR_NAME}' not found in Ivy cache '{ivy_jars_dir}'. "
+                "Spark spatial operations require this exact JAR."
+            )
+    except OSError as exc:
+        raise FileNotFoundError(
+            f"Required Sedona 1.9.1 shaded JAR '{SEDONA_SHADED_JAR_NAME}' in '{ivy_jars_dir}' is inaccessible: {exc}"
+        ) from exc
 
-        jars = []
-        # Primary shaded jar
-        shaded_jars = list(ivy_jars_dir.glob("*sedona-spark-shaded*.jar"))
-        if shaded_jars:
-            jars.append(str(shaded_jars[0]))
-        else:
-            # Fallback to separate sedona spark jars
-            jars.extend([str(p) for p in ivy_jars_dir.glob("org.apache.sedona_sedona*.jar")])
-
-        # Geotools wrapper jar (required for ST_Transform and CRS operations)
-        geotools_jars = list(ivy_jars_dir.glob("*geotools-wrapper*.jar"))
-        if geotools_jars:
-            jars.append(str(geotools_jars[0]))
-
-        return jars
-    except OSError:
-        # In sandboxed or restricted environments, gracefully return empty list
-        return []
+    validate_sedona_jar_checksum(target_jar, SEDONA_SHADED_JAR_SHA256)
+    return [str(target_jar.resolve())]
 
 
 def create_sedona_session(
