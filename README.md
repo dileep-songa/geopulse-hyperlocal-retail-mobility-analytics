@@ -2,7 +2,7 @@
 
 [![Domain](https://img.shields.io/badge/Domain-Retail%20Strategy%20%26%20Geospatial%20Analytics-blue.svg)](#business-problem)
 [![Status](https://img.shields.io/badge/Status-Week%201%20%26%202%20Complete-brightgreen.svg)](#current-project-status)
-[![Tests](https://img.shields.io/badge/Tests-228%20Passing-success.svg)](#testing-and-validation-results)
+[![Tests](https://img.shields.io/badge/Tests-241%20Passing-success.svg)](#testing-and-validation-results)
 [![Data-Privacy](https://img.shields.io/badge/Privacy-100%25%20Synthetic%20Data-purple.svg)](#data-privacy-and-synthetic-data-disclaimer)
 
 GeoPulse is a geospatial analytics and data engineering platform engineered to model urban foot traffic, commercial corridor dynamics, and retail catchment overlap using privacy-preserving synthetic mobility telemetry.
@@ -75,22 +75,26 @@ flowchart LR
 
 ## Testing and Validation Results
 
-The repository incorporates automated test suites across Python and dbt layers, totaling **228 automated tests passing**:
+The repository incorporates automated test suites across Python and dbt layers, totaling **241 automated tests passing** (176 Python + 65 dbt). In addition, a standalone Java shim integration test verifies 7 filesystem operations:
 
 ```text
 ============================= Python Test Suite =============================
 tests/test_study_area_spec.py ....................                     (9 passed)
 tests/test_data_generator.py ....................                     (20 passed)
 tests/test_data_quality.py ....................................       (36 passed)
-tests/test_spatial_analysis.py ...................................... (45 passed)
+tests/test_spatial_analysis.py ...................................... (58 passed)
 tests/test_retail_mobility_analytics.py ............................. (53 passed)
-Total Python Tests: 163 passed in 1.21s (0 failures, 0 errors)
+Total Python Tests: 176 passed in 1.41s (0 failures, 0 errors)
 
 ============================== dbt Test Suite ===============================
 Source Tests (raw_store_catchment_memberships) ....................... (10 passed)
 Model Schema Tests (uniqueness, not-null, relationships, accepted) ... (49 passed)
 Singular Integration Tests (row counts, grain uniqueness, invariants) . (6 passed)
 Total dbt Tests: 65 passed in 73.84s (0 failures, 0 errors, 0 warnings)
+
+================== Standalone Java Shim Integration Harness =================
+TestWindowsLocalFileSystem (Adoptium OpenJDK 11) ........... (7/7 steps passed)
+(Note: 7 integration steps are verified separately and not included in the 241 count)
 ```
 
 ### Spark-to-Snowflake Metric Parity
@@ -102,6 +106,21 @@ Every metric across the four analytical marts was verified row-by-row and column
 | `fct_store_time_of_day_activity` | `(store, daypart)` / **16** | `(store, daypart)` / **16** | Identical (5 cols) | **0 mismatches** (`diff = 0.0`) | **4,051** SF / **4,051** Spark |
 | `fct_daily_store_summary` | `(store, date)` / **8** | `(store, date)` / **8** | Identical (7 cols) | **0 mismatches** (`diff = 0.0`) | **4,051** SF / **4,051** Spark |
 | `fct_store_overlap_summary` | `(store)` / **4** | `(store)` / **4** | Identical (8 cols) | **0 mismatches** (`diff = 0.0`) | **4,051** SF / **4,051** Spark |
+
+### 100K Local Spark Spatial Benchmark (Run 1)
+To evaluate the local execution performance and memory footprint of the Apache Sedona spatial containment engine on a single developer workstation, a **100,000-record local Spark spatial benchmark** was executed on 2026-11-25 under strict telemetry monitoring:
+
+- **Volume & Entities**: 100,000 synthetic mobility records across 5,000 simulated devices (seed `42`).
+- **Engine Execution**: Apache Sedona 1.9.1 on PySpark 3.5.9, Java 11.0.33, `local[2]` (single-node local execution), 1536 MB driver heap, 4 shuffle partitions, UTC timezone, Arrow disabled.
+- **Execution Performance**: Total wall-clock time **24.002 seconds**; pipeline execution time **12.701 seconds**.
+- **Spatial Containment Output**: Matched **43,283 catchment memberships** across 4 candidate stores:
+  - **STORE_A (GeoPulse Coffee A)**: 11,307 matched pings, 1,394 distinct devices
+  - **STORE_B (GeoPulse Coffee B)**: 12,436 matched pings, 1,593 distinct devices
+  - **STORE_C (GeoPulse Coffee C)**: 10,607 matched pings, 1,378 distinct devices
+  - **STORE_D (GeoPulse Coffee D)**: 8,933 matched pings, 1,135 distinct devices
+- **Mathematical Invariant & Overlap**: $40,927\text{ (single-catchment)} + 2 \times 1,178\text{ (two-catchment)} = 43,283\text{ memberships}$ ($42,105$ overall distinct matched pings, $3,631$ overall distinct matched devices).
+- **Pure-Java Windows Hadoop Shim**: Bypassed Windows native C++ dependencies (`winutils.exe` and `NativeIO$Windows.access0`) via custom in-repo Java class `com.geopulse.hadoop.WindowsLocalFileSystem` without external binary downloads.
+- **Formal Technical Review**: Detailed audit findings, memory dynamics (4 GiB pre-launch gate vs. 3.58 GiB runtime minimum), and single-node local execution scope are documented in [reports/MID_PROJECT_TECHNICAL_REVIEW.md](reports/MID_PROJECT_TECHNICAL_REVIEW.md).
 
 ---
 
@@ -131,8 +150,11 @@ GeoPulse/
 │   ├── PROJECT_CHARTER.md       # Project charter, milestone governance, and scope boundaries
 │   └── TECHNICAL_OVERVIEW.md    # Technical architecture, component deep-dives, and data models
 ├── reports/
+│   ├── MID_PROJECT_TECHNICAL_REVIEW.md # Mid-project technical review & 100K local benchmark audit
 │   ├── WEEK1_COMPLETION_REPORT.md   # Consolidated Week 1 foundation & engineering closeout report
 │   └── WEEK2_COMPLETION_REPORT.md   # Consolidated Week 2 spatial analytics & dbt ELT closeout report
+├── scripts/
+│   └── benchmark_100k.py        # 100K local Spark spatial benchmark runner
 ├── sql/
 │   └── snowflake/               # Prepared Snowflake DDL & spatial transformation scripts
 │       ├── 001_create_raw_mobility_table.sql
@@ -143,12 +165,17 @@ GeoPulse/
 │   ├── data_quality.py          # Data quality validation engine and contract verification
 │   ├── spatial_analysis.py      # Apache Sedona planar projection and 500m buffer join pipeline
 │   └── retail_mobility_analytics.py # PySpark retail mobility analytics and baseline generation
-└── tests/
-    ├── test_study_area_spec.py  # Spatial boundary and schema contract unit tests
-    ├── test_data_generator.py   # Generator kinematics and reproducibility tests
-    ├── test_data_quality.py     # Schema, boundary, and velocity assertion test suites
-    ├── test_spatial_analysis.py # Spatial projection, buffer geometry, and membership join tests
-    └── test_retail_mobility_analytics.py # Retail aggregation, diurnal windows, and reconciliation tests
+├── tests/
+│   ├── test_study_area_spec.py  # Spatial boundary and schema contract unit tests
+│   ├── test_data_generator.py   # Generator kinematics and reproducibility tests
+│   ├── test_data_quality.py     # Schema, boundary, and velocity assertion test suites
+│   ├── test_spatial_analysis.py # Spatial projection, buffer geometry, and membership join tests
+│   └── test_retail_mobility_analytics.py # Retail aggregation, diurnal windows, and reconciliation tests
+└── tools/
+    └── shims/                   # Pure-Java Windows Hadoop filesystem shim
+        ├── WindowsLocalFileSystem.java     # Source shim overriding RawLocalFileSystem
+        ├── TestWindowsLocalFileSystem.java # Standalone 7-stage verification test
+        └── windows-hadoop-shim.jar        # Locally generated, Git-ignored build artifact
 ```
 
 ---
@@ -191,8 +218,13 @@ To maintain academic and professional standards, the following technical constra
     - [x] Apache Sedona planar projection (UTM 43N) and 500m buffer join (`src/spatial_analysis.py`, 4,051 memberships)
     - [x] PySpark retail mobility analytics engine (`src/retail_mobility_analytics.py`, 4 baseline datasets)
     - [x] Snowflake dbt ELT project (`dbt/geopulse_analytics/`, 2 views, 4 mart tables)
-    - [x] Automated test suite: 163 Python tests + 65 dbt tests = 228 automated tests passing
+    - [x] Automated test suite: 176 Python tests + 65 dbt tests = 241 automated tests passing
     - [x] 100% exact numerical metric reconciliation between PySpark baseline and Snowflake tables
+  - [x] **Mid-Project Milestone & 100K Local Spark Spatial Benchmark**: [reports/MID_PROJECT_TECHNICAL_REVIEW.md](reports/MID_PROJECT_TECHNICAL_REVIEW.md)
+    - [x] Windows Hadoop NativeIO resolution via pure-Java filesystem shim (`tools/shims/`)
+    - [x] 100K local Spark spatial containment benchmark (Run 1: 24.002s wall-clock, 43,283 memberships)
+    - [x] Real-time memory profiling via Win32 ctypes and psutil dual telemetry
+    - [x] Comprehensive mid-project technical review and academic originality audit
   - [ ] **Week 3: Planned / Not Started** — Interactive Geospatial Visualization & Dashboard (Kepler.gl / React / Streamlit)
   - [ ] **Week 4: Planned / Not Started** — Advanced Dwell-Time Clustering & Walking-Network Isochrone Modeling
   - [ ] **Week 5/6: Planned / Not Started** — End-to-End Apache Airflow Orchestration & CI/CD Pipelines
