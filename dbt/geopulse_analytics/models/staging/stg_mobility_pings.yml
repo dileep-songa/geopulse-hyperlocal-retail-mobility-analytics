@@ -1,0 +1,86 @@
+version: 2
+
+sources:
+  - name: raw
+    database: GEOPULSE_DB
+    schema: RAW
+    description: "Raw landing schema for GeoPulse mobility and spatial reference datasets."
+    tables:
+      - name: raw_mobility_pings
+        description: "Raw canonical 8-column synthetic GPS mobility observations for the Indiranagar study area."
+        columns:
+          - name: ping_id
+            description: "Globally unique RFC 4122 UUIDv4 identifier for the discrete GPS observation ping."
+            tests:
+              - not_null
+              - unique
+          - name: device_id
+            description: "Pseudonymous RFC 4122 UUIDv4 identifier of the simulated agent."
+            tests:
+              - not_null
+          - name: event_timestamp
+            description: "Observation timestamp in timezone-aware UTC."
+            tests:
+              - not_null
+          - name: latitude
+            description: "Geodetic latitude in decimal degrees (WGS 84 / EPSG:4326)."
+            tests:
+              - not_null
+          - name: longitude
+            description: "Geodetic longitude in decimal degrees (WGS 84 / EPSG:4326)."
+            tests:
+              - not_null
+          - name: accuracy_meters
+            description: "Simulated horizontal accuracy estimate in meters."
+            tests:
+              - not_null
+          - name: movement_mode
+            description: "Kinematic movement mode: pedestrian_walking, stationary_dwell, or vehicular_transit."
+            tests:
+              - not_null
+          - name: data_provenance
+            description: "Constant provenance metadata tag confirming synthetic generation origin: geopulse_synthetic_v1."
+            tests:
+              - not_null
+
+models:
+  - name: stg_mobility_pings
+    description: "Staged canonical GPS mobility observations with timezone-converted local timestamp attributes."
+    columns:
+      - name: ping_id
+        description: "Unique observation identifier."
+        tests:
+          - not_null
+          - unique
+      - name: device_id
+        description: "Device identifier."
+        tests:
+          - not_null
+      - name: event_timestamp
+        description: "UTC event timestamp."
+        tests:
+          - not_null
+      - name: event_timestamp_ist
+        description: "Indian Standard Time event timestamp (UTC+05:30)."
+        tests:
+          - not_null
+      - name: calendar_date
+        description: "Local calendar date."
+        tests:
+          - not_null
+      - name: hour_of_day
+        description: "Local operating hour of day (0-23)."
+        tests:
+          - not_null
+      - name: time_of_day
+        description: "Diurnal window classification: morning, afternoon, evening, night."
+        tests:
+          - not_null
+      - name: latitude
+        description: "Geodetic latitude."
+        tests:
+          - not_null
+      - name: longitude
+        description: "Geodetic longitude."
+        tests:
+          - not_null

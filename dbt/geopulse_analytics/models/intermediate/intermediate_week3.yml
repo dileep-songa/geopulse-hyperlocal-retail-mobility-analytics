@@ -1,0 +1,65 @@
+version: 2
+
+models:
+  - name: int_store_spatial_states
+    description: "Pairwise spatial state classification for every source observation ping (10,000 pings) across the 6 unordered candidate store pairs (60,000 rows complete grid)."
+    columns:
+      - name: ping_id
+        description: "Discrete observation ping identifier."
+        tests:
+          - not_null
+      - name: device_id
+        description: "Pseudonymous device identifier."
+        tests:
+          - not_null
+      - name: event_timestamp
+        description: "Observation timestamp in UTC."
+        tests:
+          - not_null
+      - name: store_id_a
+        description: "First store in the canonical pair (store_id_a < store_id_b)."
+        tests:
+          - not_null
+      - name: store_id_b
+        description: "Second store in the canonical pair."
+        tests:
+          - not_null
+      - name: pairwise_state
+        description: "Mutually exclusive state: ORIGIN_ONLY, DEST_ONLY, SHARED_PAIR, OUTSIDE_PAIR."
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['ORIGIN_ONLY', 'DEST_ONLY', 'SHARED_PAIR', 'OUTSIDE_PAIR']
+
+  - name: int_store_pairwise_device_transitions
+    description: "Extracted valid directed customer transitions between exclusive catchment states preserving full trajectory sequence."
+    columns:
+      - name: transition_id
+        description: "Deterministic transition identifier."
+        tests:
+          - not_null
+          - unique
+      - name: device_id
+        description: "Identifier of the transitioning device."
+        tests:
+          - not_null
+      - name: origin_store_id
+        description: "Origin store identifier."
+        tests:
+          - not_null
+      - name: destination_store_id
+        description: "Destination store identifier."
+        tests:
+          - not_null
+      - name: duration_minutes
+        description: "Elapsed duration in minutes (<= 60.0)."
+        tests:
+          - not_null
+      - name: transit_speed_mps
+        description: "Straight-line displacement speed in metres per second (<= 15.0 m/s)."
+        tests:
+          - not_null
+      - name: is_kinematically_plausible
+        description: "Boolean indicator of kinematic plausibility ceiling enforcement."
+        tests:
+          - not_null
