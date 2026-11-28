@@ -1,0 +1,267 @@
+version: 2
+
+models:
+  - name: fct_store_pairwise_overlap
+    description: >
+      Pairwise spatial overlap and macro competition metrics for the 6 canonical unordered candidate store pairs
+      (store_id_a < store_id_b) generated from 4 candidate retail locations.
+
+      Evaluates exact planar regular 32-gon catchment geometry intersections (EPSG:32643 metric projection,
+      matching Apache Sedona ST_Buffer(point, 500m, 8) and Sutherland-Hodgman polygon clipping) alongside empirical
+      device overlap measures.
+
+      Canonical Geometric Overlap Ratio (GOR = lens_area / union_area) Reference Values:
+      - STORE_A - STORE_B: lens = 29,518.22 m², union = 1,531,204.36 m², GOR = 0.0193
+      - STORE_B - STORE_D: lens = 23,003.02 m², union = 1,537,719.56 m², GOR = 0.0150
+      - STORE_B - STORE_C: lens = 16,111.54 m², union = 1,544,611.04 m², GOR = 0.0104
+      - Disjoint pairs (STORE_A - STORE_C, STORE_A - STORE_D, STORE_C - STORE_D): lens = 0.00 m², GOR = 0.0000
+
+      Governance Disclaimer:
+      Metrics measure geographic catchment overlap and empirical mobility device co-presence. They do not
+      represent commercial transaction cannibalization or revenue loss. Conversion Readiness Score (CRS) is
+      explicitly excluded from this canonical production mart.
+    columns:
+      - name: store_id_a
+        description: "First store identifier in the canonical pair (store_id_a < store_id_b)."
+        tests:
+          - not_null
+      - name: store_name_a
+        description: "Descriptive storefront name for store A."
+        tests:
+          - not_null
+      - name: store_id_b
+        description: "Second store identifier in the canonical pair."
+        tests:
+          - not_null
+      - name: store_name_b
+        description: "Descriptive storefront name for store B."
+        tests:
+          - not_null
+      - name: lens_intersection_area_m2
+        description: "Exact 32-gon polygon lens intersection area in square metres."
+        tests:
+          - not_null
+      - name: union_polygon_area_m2
+        description: "Total pairwise polygon union area in square metres (area_a + area_b - lens_area)."
+        tests:
+          - not_null
+      - name: geometric_overlap_ratio
+        description: "Geometric Overlap Ratio (GOR = lens_area / union_area) bounded in [0.0000, 1.0000]."
+        tests:
+          - not_null
+      - name: unique_devices_store_a
+        description: "Total distinct devices observed in Catchment A across the observation period."
+        tests:
+          - not_null
+      - name: unique_devices_store_b
+        description: "Total distinct devices observed in Catchment B across the observation period."
+        tests:
+          - not_null
+      - name: shared_unique_devices
+        description: "Distinct devices observed in both Catchment A and Catchment B across the observation period."
+        tests:
+          - not_null
+      - name: union_unique_devices
+        description: "Distinct devices observed in Catchment A OR Catchment B across the observation period."
+        tests:
+          - not_null
+      - name: device_jaccard_index
+        description: "Device Jaccard Index (DJI = shared_devices / union_devices) bounded in [0.0000, 1.0000]."
+        tests:
+          - not_null
+      - name: overlap_coefficient
+        description: "Symmetric Szymkiewicz-Simpson Overlap Coefficient (DOC = shared_devices / min(devices_a, devices_b)) bounded in [0.0000, 1.0000]."
+        tests:
+          - not_null
+      - name: total_shared_lens_pings
+        description: "Count of raw GPS pings falling inside the physical intersection polygon of both catchments."
+        tests:
+          - not_null
+      - name: mean_hourly_shared_devices
+        description: "Mean number of distinct shared devices per operating hour across the 14 operating hours."
+        tests:
+          - not_null
+      - name: peak_hourly_shared_devices
+        description: "Maximum number of distinct shared devices observed in any single operating hour."
+        tests:
+          - not_null
+      - name: pctr_15m_a_to_b
+        description: "Pairwise Cross-Catchment Transition Rate from A to B within 15 minutes."
+      - name: pctr_30m_a_to_b
+        description: "Pairwise Cross-Catchment Transition Rate from A to B within 30 minutes."
+      - name: pctr_60m_a_to_b
+        description: "Pairwise Cross-Catchment Transition Rate from A to B within 60 minutes."
+      - name: pctr_15m_b_to_a
+        description: "Pairwise Cross-Catchment Transition Rate from B to A within 15 minutes."
+      - name: pctr_30m_b_to_a
+        description: "Pairwise Cross-Catchment Transition Rate from B to A within 30 minutes."
+      - name: pctr_60m_b_to_a
+        description: "Pairwise Cross-Catchment Transition Rate from B to A within 60 minutes."
+
+  - name: fct_store_pairwise_hourly_overlap
+    description: >
+      Diurnal hourly shared device activity and ping volume across the 14 operating hours (08:00 to 21:59 local IST)
+      for all 6 canonical store pairs (84 rows total = 6 pairs x 14 operating hours).
+
+      Zero-filled across all operating hours to preserve a complete diurnal time-series grid even during zero-activity hours.
+    columns:
+      - name: store_id_a
+        description: "First store identifier in the canonical pair."
+        tests:
+          - not_null
+      - name: store_name_a
+        description: "Descriptive storefront name for store A."
+        tests:
+          - not_null
+      - name: store_id_b
+        description: "Second store identifier in the canonical pair."
+        tests:
+          - not_null
+      - name: store_name_b
+        description: "Descriptive storefront name for store B."
+        tests:
+          - not_null
+      - name: hour_of_day
+        description: "Local operating hour of day in IST (08 to 21 inclusive)."
+        tests:
+          - not_null
+      - name: shared_device_count
+        description: "Distinct devices observed in both catchments during operating hour h."
+        tests:
+          - not_null
+      - name: shared_ping_volume
+        description: "Total observation pings recorded in both catchments during operating hour h."
+        tests:
+          - not_null
+      - name: hourly_diurnal_share
+        description: "Fraction of daily pairwise shared ping volume occurring during operating hour h bounded in [0.0000, 1.0000]."
+        tests:
+          - not_null
+
+  - name: fct_store_cross_catchment_transitions
+    description: >
+      Directional customer mobility flows and transition kinematics across all 12 ordered store pairs (origin != destination).
+
+      Evaluates the Pairwise Cross-Catchment Transition Rate (PCTR) across 15, 30, and 60 minute duration windows.
+      Enforces the strict distinct-device numerator contract:
+        PCTR(A -> B) = unique devices with qualifying transition / all unique devices in origin Catchment A.
+
+      Invariants:
+      - 0 <= unique_transitioning_devices_15m <= unique_transitioning_devices_30m <= unique_transitioning_devices_60m <= total_origin_devices
+      - 0.0000 <= pctr_15m <= pctr_30m <= pctr_60m <= 1.0000
+    columns:
+      - name: origin_store_id
+        description: "Origin store identifier."
+        tests:
+          - not_null
+      - name: origin_store_name
+        description: "Origin store descriptive storefront name."
+        tests:
+          - not_null
+      - name: destination_store_id
+        description: "Destination store identifier."
+        tests:
+          - not_null
+      - name: destination_store_name
+        description: "Destination store descriptive storefront name."
+        tests:
+          - not_null
+      - name: total_origin_devices
+        description: "Contract Denominator: Total distinct devices observed in origin catchment across the entire observation window."
+        tests:
+          - not_null
+      - name: total_transition_events
+        description: "Total completed transition event rows recorded for this directed pair."
+        tests:
+          - not_null
+      - name: total_transitioning_devices
+        description: "Total distinct devices that completed at least one transition within 60 minutes."
+        tests:
+          - not_null
+      - name: unique_transitioning_devices_15m
+        description: "Contract Numerator (15m): Distinct devices completing a valid transition within 15 minutes."
+        tests:
+          - not_null
+      - name: unique_transitioning_devices_30m
+        description: "Contract Numerator (30m): Distinct devices completing a valid transition within 30 minutes."
+        tests:
+          - not_null
+      - name: unique_transitioning_devices_60m
+        description: "Contract Numerator (60m): Distinct devices completing a valid transition within 60 minutes."
+        tests:
+          - not_null
+      - name: pctr_15m
+        description: "Pairwise Cross-Catchment Transition Rate (15 min) bounded in [0.0000, 1.0000]."
+      - name: pctr_30m
+        description: "Pairwise Cross-Catchment Transition Rate (30 min) bounded in [0.0000, 1.0000]."
+      - name: pctr_60m
+        description: "Pairwise Cross-Catchment Transition Rate (60 min) bounded in [0.0000, 1.0000]."
+      - name: median_transit_minutes
+        description: "Median elapsed transit duration in minutes for valid completed transitions."
+      - name: min_transit_minutes
+        description: "Minimum elapsed transit duration in minutes for valid completed transitions."
+      - name: max_transit_minutes
+        description: "Maximum elapsed transit duration in minutes for valid completed transitions (<= 60.0)."
+      - name: mean_transit_speed_mps
+        description: "Mean straight-line displacement transit speed in metres per second (<= 15.0 m/s)."
+
+  - name: fct_store_temporal_opportunity
+    description: >
+      Store temporal traffic profiles and opportunity metrics across the 14 operating hours (08:00 to 21:59 local IST)
+      for all 4 candidate retail storefronts.
+
+      Core Metrics:
+      - Peak Hour Index (PHI): Ratio of peak operating hour volume to median operating hourly volume (max_vol / median_vol).
+      - Peak Hour Window: Earliest operating hour achieving peak volume (formatted as HH:00 with deterministic tie-breaking).
+      - Low-Activity Hour Share (LAHS): Proportion of operating hours operating strictly below 50% of the store's median volume.
+      - Zero-Median Safety: Flags stores with zero median activity and sets PHI to NULL to prevent division by zero.
+
+      Governance:
+      All temporal metrics reflect pedestrian traffic density and dwell opportunities. They do not predict store revenue
+      or transaction conversions.
+      The 14 operating hours (08:00 to 21:59 local IST) represent an analytical modeling assumption for retail traffic evaluation,
+      rather than an empirically validated store operating schedule.
+    columns:
+      - name: store_id
+        description: "Store identifier."
+        tests:
+          - not_null
+          - unique
+      - name: store_name
+        description: "Descriptive storefront name."
+        tests:
+          - not_null
+      - name: operating_volume
+        description: "Total observation pings recorded within store catchment during operating hours (08:00 - 21:59 local IST)."
+        tests:
+          - not_null
+      - name: peak_hour_window
+        description: "Earliest operating hour achieving peak volume formatted as HH:00."
+        tests:
+          - not_null
+      - name: peak_hour_volume
+        description: "Maximum ping volume recorded in any single operating hour."
+        tests:
+          - not_null
+      - name: median_operating_hourly_volume
+        description: "Median hourly ping volume across the 14 operating hours."
+        tests:
+          - not_null
+      - name: has_zero_median_activity
+        description: "Boolean safety flag indicating whether median operating volume is zero."
+        tests:
+          - not_null
+      - name: peak_hour_index
+        description: "Peak Hour Index (PHI = peak_volume / median_volume) rounded to 2 decimal places. NULL if median is 0."
+      - name: low_activity_threshold
+        description: "Low-activity threshold defined as 50% of median operating hourly volume (0.50 * median)."
+        tests:
+          - not_null
+      - name: low_activity_hours_count
+        description: "Number of operating hours with ping volume strictly below low_activity_threshold (0 to 14)."
+        tests:
+          - not_null
+      - name: low_activity_hour_share
+        description: "Low-Activity Hour Share (LAHS = low_activity_hours_count / 14) bounded in [0.0000, 1.0000]."
+        tests:
+          - not_null
